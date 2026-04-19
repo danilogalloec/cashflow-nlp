@@ -7,3 +7,4 @@ node_modules/
 dist/
 postgres_data/
 .DS_Store
+tsconfig.tsbuildinfo
