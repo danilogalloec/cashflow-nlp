@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, RefreshCw, Loader2, AlertCircle, X, CheckCircle, Calendar, Pencil } from 'lucide-react';
+import { Plus, RefreshCw, Loader2, AlertCircle, X, CheckCircle, Calendar, Pencil, Clock, CreditCard } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { api, ApiError } from '@/lib/api';
 import type { SubscriptionOut, SubscriptionCreate, SubscriptionUpdate, CurrencyCode, IncomeFrequency } from '@/lib/types';
@@ -15,6 +15,12 @@ const FREQ_MULTIPLIERS: Record<IncomeFrequency, number> = {
   once: 0, daily: 30, weekly: 4.33, biweekly: 2.17, monthly: 1, annual: 1 / 12,
 };
 
+function remainingMonths(endDate: string): number {
+  const end = new Date(endDate + 'T00:00:00');
+  const now = new Date();
+  return Math.max(0, Math.round((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30.44)));
+}
+
 function fmt(value: string, currency = 'USD') {
   const n = parseFloat(value);
   if (isNaN(n)) return value;
@@ -23,14 +29,31 @@ function fmt(value: string, currency = 'USD') {
 
 const field = 'w-full bg-bg-elevated border border-bg-border rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-primary/60 transition-colors';
 
+function addMonths(base: string, months: number): string {
+  const d = base ? new Date(base + 'T00:00:00') : new Date();
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().slice(0, 10);
+}
+
 // ── Create Modal ───────────────────────────────────────────────────────────────
 function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (s: SubscriptionOut) => void }) {
   const { token } = useAuth();
   const [form, setForm] = useState<SubscriptionCreate>({
     name: '', amount: '', currency: 'USD', frequency: 'monthly',
   });
+  const [durationMonths, setDurationMonths] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const handleMonthsChange = (val: string) => {
+    setDurationMonths(val);
+    const n = parseInt(val);
+    if (n > 0) {
+      setForm(f => ({ ...f, end_date: addMonths(f.next_due ?? '', n) }));
+    } else {
+      setForm(f => ({ ...f, end_date: undefined }));
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,7 +72,7 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-bg-surface border border-bg-border rounded-2xl p-6 w-full max-w-md mx-4">
+      <div className="bg-bg-surface border border-bg-border rounded-2xl p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-semibold text-white">Nueva suscripción</h2>
           <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors"><X size={18} /></button>
@@ -62,7 +85,7 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
         <form onSubmit={submit} className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-slate-400 mb-1.5">Nombre</label>
-            <input className={field} placeholder="Ej: Netflix, Spotify, Gimnasio…" value={form.name}
+            <input className={field} placeholder="Ej: Netflix, Maestría, Gimnasio…" value={form.name}
               onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -91,10 +114,52 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">Próximo cobro (opcional)</label>
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">Primer cobro (opcional)</label>
             <input className={field} type="date" value={form.next_due ?? ''}
-              onChange={e => setForm(f => ({ ...f, next_due: e.target.value || undefined }))} />
+              onChange={e => {
+                const nd = e.target.value || undefined;
+                setForm(f => {
+                  const months = parseInt(durationMonths);
+                  return { ...f, next_due: nd, end_date: months > 0 ? addMonths(nd ?? '', months) : f.end_date };
+                });
+              }} />
           </div>
+
+          {/* Duration section */}
+          <div className="bg-bg-elevated border border-bg-border rounded-xl p-4 space-y-3">
+            <p className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+              <Clock size={12} />Duración limitada (opcional)
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Número de meses</label>
+                <input
+                  className={field}
+                  type="number" min="1" max="360" placeholder="Ej: 24"
+                  value={durationMonths}
+                  onChange={e => handleMonthsChange(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Fecha de fin calculada</label>
+                <input
+                  className={field}
+                  type="date"
+                  value={form.end_date ?? ''}
+                  onChange={e => {
+                    setDurationMonths('');
+                    setForm(f => ({ ...f, end_date: e.target.value || undefined }));
+                  }}
+                />
+              </div>
+            </div>
+            {form.end_date && (
+              <p className="text-xs text-amber-400">
+                Esta suscripción termina el {new Date(form.end_date + 'T00:00:00').toLocaleDateString('es-GT', { day: '2-digit', month: 'long', year: 'numeric' })}
+              </p>
+            )}
+          </div>
+
           <div>
             <label className="block text-xs font-medium text-slate-400 mb-1.5">Notas (opcional)</label>
             <input className={field} placeholder="Ej: plan familiar, cuenta compartida…"
@@ -120,9 +185,23 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
 // ── Edit Modal ─────────────────────────────────────────────────────────────────
 function EditModal({ sub, onClose, onUpdated }: { sub: SubscriptionOut; onClose: () => void; onUpdated: (s: SubscriptionOut) => void }) {
   const { token } = useAuth();
-  const [form, setForm] = useState<SubscriptionUpdate>({ name: sub.name, amount: sub.amount, frequency: sub.frequency });
+  const [form, setForm] = useState<SubscriptionUpdate>({
+    name: sub.name, amount: sub.amount, frequency: sub.frequency,
+    next_due: sub.next_due ?? undefined, end_date: sub.end_date ?? undefined,
+  });
+  const [durationMonths, setDurationMonths] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const handleMonthsChange = (val: string) => {
+    setDurationMonths(val);
+    const n = parseInt(val);
+    if (n > 0) {
+      setForm(f => ({ ...f, end_date: addMonths(f.next_due ?? sub.next_due ?? '', n) }));
+    } else {
+      setForm(f => ({ ...f, end_date: undefined }));
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,7 +220,7 @@ function EditModal({ sub, onClose, onUpdated }: { sub: SubscriptionOut; onClose:
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-bg-surface border border-bg-border rounded-2xl p-6 w-full max-w-sm mx-4">
+      <div className="bg-bg-surface border border-bg-border rounded-2xl p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-semibold text-white">Editar suscripción</h2>
           <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors"><X size={18} /></button>
@@ -171,6 +250,48 @@ function EditModal({ sub, onClose, onUpdated }: { sub: SubscriptionOut; onClose:
               ))}
             </select>
           </div>
+
+          {/* Duration section */}
+          <div className="bg-bg-elevated border border-bg-border rounded-xl p-4 space-y-3">
+            <p className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
+              <Clock size={12} />Duración limitada (opcional)
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Meses restantes</label>
+                <input
+                  className={field}
+                  type="number" min="1" max="360" placeholder="Ej: 24"
+                  value={durationMonths}
+                  onChange={e => handleMonthsChange(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Fecha de fin</label>
+                <input
+                  className={field}
+                  type="date"
+                  value={form.end_date ?? ''}
+                  onChange={e => {
+                    setDurationMonths('');
+                    setForm(f => ({ ...f, end_date: e.target.value || undefined }));
+                  }}
+                />
+              </div>
+            </div>
+            {form.end_date && (
+              <p className="text-xs text-amber-400">
+                Termina el {new Date(form.end_date + 'T00:00:00').toLocaleDateString('es-GT', { day: '2-digit', month: 'long', year: 'numeric' })}
+              </p>
+            )}
+            {form.end_date && (
+              <button type="button" onClick={() => { setDurationMonths(''); setForm(f => ({ ...f, end_date: undefined })); }}
+                className="text-xs text-slate-500 hover:text-red-400 transition-colors">
+                Quitar fecha de fin
+              </button>
+            )}
+          </div>
+
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose}
               className="flex-1 py-2.5 rounded-xl border border-bg-border text-sm text-slate-400 hover:text-white hover:border-slate-500 transition-colors">
@@ -196,6 +317,8 @@ export default function SubscriptionsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<SubscriptionOut | null>(null);
+  const [paying, setPaying] = useState<string | null>(null);
+  const [paySuccess, setPaySuccess] = useState<string | null>(null);
 
   const load = () => {
     if (!token) return;
@@ -214,6 +337,18 @@ export default function SubscriptionsPage() {
       const updated = await api.subscriptions.update(token, sub.id, { is_active: !sub.is_active });
       setSubs(prev => prev.map(s => s.id === sub.id ? updated : s));
     } catch { /* silent */ }
+  };
+
+  const handlePay = async (sub: SubscriptionOut) => {
+    if (!token) return;
+    setPaying(sub.id);
+    try {
+      await api.subscriptions.pay(token, sub.id);
+      setPaySuccess(sub.id);
+      load();
+      setTimeout(() => setPaySuccess(null), 2500);
+    } catch { /* silent */ }
+    finally { setPaying(null); }
   };
 
   const monthlyTotal = subs
@@ -265,6 +400,7 @@ export default function SubscriptionsPage() {
                 <th className="px-5 py-3.5 text-left font-medium">Suscripción</th>
                 <th className="px-5 py-3.5 text-left font-medium">Frecuencia</th>
                 <th className="px-5 py-3.5 text-left font-medium">Próximo cobro</th>
+                <th className="px-5 py-3.5 text-left font-medium">Duración</th>
                 <th className="px-5 py-3.5 text-right font-medium">Monto</th>
                 <th className="px-5 py-3.5 text-right font-medium">Equiv. mensual</th>
                 <th className="px-5 py-3.5 text-center font-medium">Estado</th>
@@ -302,6 +438,24 @@ export default function SubscriptionsPage() {
                         <span className="text-slate-600">—</span>
                       )}
                     </td>
+                    <td className="px-5 py-4">
+                      {sub.end_date ? (() => {
+                        const mo = remainingMonths(sub.end_date);
+                        return (
+                          <div>
+                            <div className="flex items-center gap-1.5 text-amber-400 text-xs font-medium">
+                              <Clock size={11} />
+                              {mo > 0 ? `${mo} meses restantes` : 'Finalizada'}
+                            </div>
+                            <div className="text-xs text-slate-500 mt-0.5">
+                              Fin: {new Date(sub.end_date + 'T00:00:00').toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </div>
+                          </div>
+                        );
+                      })() : (
+                        <span className="text-slate-600 text-xs">Sin límite</span>
+                      )}
+                    </td>
                     <td className="px-5 py-4 text-right font-mono font-semibold text-red-400">
                       {fmt(sub.amount, sub.currency)}
                     </td>
@@ -319,11 +473,31 @@ export default function SubscriptionsPage() {
                       </button>
                     </td>
                     <td className="px-5 py-4 text-center">
-                      <button onClick={() => setEditing(sub)}
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-primary-light hover:bg-primary/10 transition-colors"
-                        title="Editar">
-                        <Pencil size={14} />
-                      </button>
+                      <div className="flex items-center justify-center gap-1">
+                        {sub.is_active && (
+                          <button
+                            onClick={() => handlePay(sub)}
+                            disabled={paying === sub.id}
+                            title="Registrar pago"
+                            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${
+                              paySuccess === sub.id
+                                ? 'bg-emerald-500/20 text-emerald-300'
+                                : 'bg-blue-500/10 text-blue-300 hover:bg-blue-500/20'
+                            }`}>
+                            {paying === sub.id
+                              ? <Loader2 size={11} className="animate-spin" />
+                              : paySuccess === sub.id
+                              ? <CheckCircle size={11} />
+                              : <CreditCard size={11} />}
+                            {paySuccess === sub.id ? 'Pagado' : 'Pagar'}
+                          </button>
+                        )}
+                        <button onClick={() => setEditing(sub)}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-primary-light hover:bg-primary/10 transition-colors"
+                          title="Editar">
+                          <Pencil size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

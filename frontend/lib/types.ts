@@ -6,6 +6,27 @@ export type TransactionStatus = 'pending' | 'completed' | 'cancelled';
 export type InputMethod = 'manual' | 'voice' | 'text_nlp' | 'import';
 export type IncomeFrequency = 'once' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'annual';
 
+// ── Categories ───────────────────────────────────────────────────────────────
+export interface CategoryOut {
+  id: string;
+  name: string;
+  color: string | null;
+  icon: string | null;
+  is_system: boolean;
+}
+
+export interface CategoryCreate {
+  name: string;
+  color?: string;
+  icon?: string;
+}
+
+export interface CategoryUpdate {
+  name?: string;
+  color?: string;
+  icon?: string;
+}
+
 // ── Auth ─────────────────────────────────────────────────────────────────────
 export interface UserOut {
   id: string;
@@ -72,6 +93,7 @@ export interface TransactionOut {
   description: string | null;
   status: TransactionStatus;
   input_method: InputMethod;
+  installments: number | null;
   transaction_date: string;
   created_at: string;
 }
@@ -84,6 +106,7 @@ export interface TransactionCreate {
   description?: string;
   category_id?: string;
   to_account_id?: string;
+  installments?: number;
   transaction_date?: string;
   input_method?: InputMethod;
   raw_input?: string;
@@ -176,6 +199,7 @@ export interface SubscriptionOut {
   currency: CurrencyCode;
   frequency: IncomeFrequency;
   next_due: string | null;
+  end_date: string | null;
   category_id: string | null;
   account_id: string | null;
   is_active: boolean;
@@ -190,6 +214,7 @@ export interface SubscriptionCreate {
   currency?: CurrencyCode;
   frequency?: IncomeFrequency;
   next_due?: string;
+  end_date?: string;
   category_id?: string;
   account_id?: string;
   notes?: string;
@@ -200,8 +225,44 @@ export interface SubscriptionUpdate {
   amount?: string;
   frequency?: IncomeFrequency;
   next_due?: string;
+  end_date?: string;
   is_active?: boolean;
   notes?: string;
+}
+
+// ── Budgets ───────────────────────────────────────────────────────────────────
+export interface BudgetOut {
+  id: string;
+  name: string;
+  amount: string;
+  category_id: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BudgetCreate {
+  name: string;
+  amount: string;
+  category_id?: string;
+}
+
+export interface BudgetUpdate {
+  name?: string;
+  amount?: string;
+  category_id?: string;
+  is_active?: boolean;
+}
+
+export interface BudgetUsage {
+  budget_id: string;
+  name: string;
+  category_id: string | null;
+  category_name: string | null;
+  category_color: string | null;
+  limit: string;
+  spent: string;
+  percentage: number;
 }
 
 // ── Reports ───────────────────────────────────────────────────────────────────

@@ -21,9 +21,9 @@ def _c(pattern: str, flags: int = re.IGNORECASE) -> Pattern[str]:
     return re.compile(pattern, flags)
 
 
-_EXPENSE_RE = _c(r"\b(gast[eé]|pagu[eé]|compr[eé]|sali[oó]|egres[oó]|cobr[eé] de más|desembolsé|invertí)\b")
-_INCOME_RE = _c(r"\b(recib[ií]|cobr[eé]|ingres[eé]|depositaron|ganaron|entr[oó]|me pagaron|llegó)\b")
-_TRANSFER_RE = _c(r"\b(transfer[ií]|moví|mov[ií]|pasé|mandr?é|envié)\b")
+_EXPENSE_RE = _c(r"\b(gast[eé]|gasto|pagu[eé]|pago|compr[eéao]|compra|sali[oó]|egres[oó]|cobr[eé]\s+de\s+m[aá]s|desembolse|invert[ií]|gaste|regal[eé]|don[eé]|prest[eé]|di\b|d[ií](?:\s+(?:un|una|de|para))|perdi|perd[ií])\b")
+_INCOME_RE = _c(r"\b(recib[ií]|cobr[eé]|ingres[eé]|depositaron|ganaron|entr[oó]|me pagaron|lleg[oó])\b")
+_TRANSFER_RE = _c(r"\b(transfer[ií]|mov[ií]|pas[eé]|mandr?[eé]|envi[eé])\b")
 
 # Amount: $1,500.00 | 1.500,00 (European) | 1500 | 1,500 | 50.5
 _AMOUNT_RE = _c(
@@ -51,15 +51,18 @@ _TRANSFER_ACCOUNTS_RE = _c(
 )
 
 _CATEGORY_MAP: list[tuple[Pattern[str], str]] = [
-    (_c(r"\b(comida|restaurante|almuerzo|cena|desayuno|café|cafe|super(?:mercado)?|tienda|víveres|mercado)\b"), "Alimentación"),
-    (_c(r"\b(uber|taxi|bus|gasolina|combustible|transporte|metro|moto|pasaje|camión)\b"), "Transporte"),
-    (_c(r"\b(renta|alquiler|luz|agua|electricidad|internet|cable|casa|apartamento|habitación|hipoteca)\b"), "Vivienda"),
-    (_c(r"\b(doctor|médico|farmacia|medicina|hospital|clínica|salud|consulta|examen)\b"), "Salud"),
-    (_c(r"\b(netflix|cine|spotify|juego(?:s)?|diversión|concierto|evento|suscripción|streaming|disco)\b"), "Entretenimiento"),
-    (_c(r"\b(escuela|universidad|curso|libro(?:s)?|educación|clase(?:s)?|tutoría|colegio)\b"), "Educación"),
-    (_c(r"\b(ropa|zapatos?|camisa|pantalón|vestido|tienda\s+de\s+ropa|outfit)\b"), "Ropa"),
-    (_c(r"\b(tecnología|computadora|celular|laptop|teléfono|app|software|gadget)\b"), "Tecnología"),
-    (_c(r"\b(ahorro|inversión|fondo|piggy|reserva)\b"), "Ahorro"),
+    (_c(r"\b(comida|restaurante|almuerzo|cena|desayuno|cafe|super(?:mercado)?|tienda|viveres|mercado|pizza|hamburguesa|sushi|pollo|carne|fruta|verdura|panaderia|heladeria|cafeteria|comedor|antojitos|pupusa|taco|burrito|lunch|snack|merienda|vino(?:s)?|cerveza(?:s)?|bebida(?:s)?|licor|alcohol|bar|cantina|trago(?:s)?|ron|whisky|tequila|vodka)\b"), "Alimentación"),
+    (_c(r"\b(uber|taxi|bus|gasolina|combustible|transporte|metro|moto|pasaje|camion|gasolinera|estacionamiento|peaje|parqueo|bicicleta)\b"), "Transporte"),
+    (_c(r"\b(renta|alquiler|luz|agua|electricidad|internet|cable|casa|apartamento|habitacion|hipoteca|condominio|telefono\s+fijo)\b"), "Vivienda"),
+    (_c(r"\b(doctor|medico|farmacia|medicina|hospital|clinica|salud|consulta|examen|laboratorio|dentista|optico|pastilla(?:s)?|vitamina(?:s)?)\b"), "Salud"),
+    (_c(r"\b(netflix|cine|spotify|juego(?:s)?|diversion|concierto|evento|suscripcion|streaming|disco|teatro|parque|excursion|vacacion(?:es)?|hotel|airbnb|viaje|discoteca)\b"), "Entretenimiento"),
+    (_c(r"\b(escuela|universidad|curso|libro(?:s)?|educacion|clase(?:s)?|tutoria|colegio|academia|capacitacion|certificado|seminario|taller)\b"), "Educación"),
+    (_c(r"\b(ropa|zapato(?:s)?|camisa|pantalon|vestido|tienda\s+de\s+ropa|outfit|accesorio(?:s)?|bolsa|mochila|cinturon|marathon|zara|h&m|shein|primark|nike|adidas|puma|jeans|blusa|short|calceta(?:s)?|uniforme)\b"), "Ropa"),
+    (_c(r"\b(tecnologia|computadora|celular|laptop|telefono|app|software|gadget|audifonos|teclado|monitor|impresora|tablet|cargador)\b"), "Tecnología"),
+    (_c(r"\b(ahorro|inversion|fondo|piggy|reserva|pension|jubilacion)\b"), "Ahorro"),
+    (_c(r"\b(mascota(?:s)?|veterinario|perro|gato|acuario)\b"), "Mascotas"),
+    (_c(r"\b(gym|gimnasio|deporte(?:s)?|futbol|natacion|yoga|pilates|proteina|suplemento)\b"), "Deporte"),
+    (_c(r"\b(regalo(?:s)?|regal[eé]|obsequio(?:s)?|donacion(?:es)?|propina(?:s)?|limosna|caridad|prest[eé]|di\s+de\s+regalo)\b"), "Regalos"),
 ]
 
 _DATE_MAP: list[tuple[Pattern[str], int]] = [
@@ -79,7 +82,7 @@ _WORD_NUMBERS: dict[str, int] = {
     "cero": 0, "uno": 1, "una": 1, "dos": 2, "tres": 3, "cuatro": 4,
     "cinco": 5, "seis": 6, "siete": 7, "ocho": 8, "nueve": 9, "diez": 10,
     "once": 11, "doce": 12, "trece": 13, "catorce": 14, "quince": 15,
-    "veinte": 20, "veintiuno": 21, "veintidós": 22, "veintitrés": 23,
+    "veinte": 20, "veintiuno": 21, "veintidos": 22, "veintitres": 23,
     "treinta": 30, "cuarenta": 40, "cincuenta": 50,
     "sesenta": 60, "setenta": 70, "ochenta": 80, "noventa": 90,
     "cien": 100, "ciento": 100, "doscientos": 200, "trescientos": 300,
@@ -98,14 +101,7 @@ def _normalize(text: str) -> str:
 
 
 def _parse_amount(text: str) -> Decimal | None:
-    # Try word-number first (voice: "cien pesos")
-    wm = _WORD_NUM_RE.search(text)
-    if wm:
-        try:
-            return Decimal(str(_WORD_NUMBERS[wm.group(1).lower()]))
-        except (KeyError, InvalidOperation):
-            pass
-
+    # Try numeric regex first — prevents "una"/"uno" from matching as amount=1
     for m in _AMOUNT_RE.finditer(text):
         raw = m.group(1).replace(" ", "")
         # Normalise European comma-decimal: 1.500,50 → 1500.50
@@ -121,6 +117,15 @@ def _parse_amount(text: str) -> Decimal | None:
                 return value
         except InvalidOperation:
             continue
+
+    # Fallback: word numbers for voice input ("cien pesos", "dos mil quetzales")
+    wm = _WORD_NUM_RE.search(text)
+    if wm:
+        try:
+            return Decimal(str(_WORD_NUMBERS[wm.group(1).lower()]))
+        except (KeyError, InvalidOperation):
+            pass
+
     return None
 
 

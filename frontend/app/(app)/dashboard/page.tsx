@@ -1,14 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Wallet, TrendingUp, TrendingDown, Activity } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, Activity, Bell, Target, Calendar, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
-import type { DashboardOut } from '@/lib/types';
+import type { DashboardOut, SubscriptionOut, BudgetUsage } from '@/lib/types';
 import StatCard from '@/components/dashboard/StatCard';
 import RecentTransactions from '@/components/dashboard/RecentTransactions';
 import SpendingPieChart from '@/components/dashboard/SpendingPieChart';
 import NLPChat from '@/components/chat/NLPChat';
+import Link from 'next/link';
 
 function fmt(value: string, currency = 'USD') {
   const n = parseFloat(value);
@@ -16,17 +17,129 @@ function fmt(value: string, currency = 'USD') {
   return new Intl.NumberFormat('es-GT', { style: 'currency', currency, maximumFractionDigits: 2 }).format(n);
 }
 
+function daysUntil(dateStr: string): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(dateStr + 'T00:00:00');
+  return Math.round((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function progressColor(pct: number) {
+  if (pct >= 100) return 'bg-red-500';
+  if (pct >= 80) return 'bg-amber-400';
+  return 'bg-emerald-500';
+}
+
+// ── Upcoming Subscriptions Widget ─────────────────────────────────────────────
+function UpcomingSubscriptions({ subs }: { subs: SubscriptionOut[] }) {
+  if (subs.length === 0) return null;
+
+  return (
+    <div className="bg-bg-surface border border-amber-500/20 rounded-2xl p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <Bell size={15} className="text-amber-400" />
+        <h3 className="text-sm font-semibold text-white">Próximos cobros (7 días)</h3>
+        <span className="ml-auto px-2 py-0.5 bg-amber-500/15 text-amber-300 text-xs font-medium rounded-full">
+          {subs.length}
+        </span>
+      </div>
+      <div className="space-y-2">
+        {subs.map(sub => {
+          const days = sub.next_due ? daysUntil(sub.next_due) : null;
+          return (
+            <div key={sub.id} className="flex items-center justify-between py-2 border-b border-bg-border last:border-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                  <Calendar size={12} className="text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">{sub.name}</p>
+                  <p className="text-xs text-slate-500">
+                    {days === 0 ? 'Hoy' : days === 1 ? 'Mañana' : `En ${days} días`}
+                  </p>
+                </div>
+              </div>
+              <span className="font-mono text-sm font-semibold text-red-400">
+                {fmt(sub.amount, sub.currency)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <Link href="/subscriptions" className="mt-3 block text-xs text-center text-slate-500 hover:text-primary-light transition-colors">
+        Ver todas las suscripciones →
+      </Link>
+    </div>
+  );
+}
+
+// ── Budget Summary Widget ──────────────────────────────────────────────────────
+function BudgetSummary({ usage }: { usage: BudgetUsage[] }) {
+  if (usage.length === 0) return null;
+
+  const alerts = usage.filter(u => u.percentage >= 80);
+  if (alerts.length === 0) return null;
+
+  return (
+    <div className="bg-bg-surface border border-bg-border rounded-2xl p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <Target size={15} className="text-primary-light" />
+        <h3 className="text-sm font-semibold text-white">Presupuestos en alerta</h3>
+        <Link href="/budgets" className="ml-auto text-xs text-slate-500 hover:text-primary-light transition-colors">
+          Ver todos →
+        </Link>
+      </div>
+      <div className="space-y-3">
+        {alerts.map(u => (
+          <div key={u.budget_id}>
+            <div className="flex items-center justify-between text-xs mb-1">
+              <div className="flex items-center gap-1.5">
+                {u.category_color && (
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: u.category_color }} />
+                )}
+                <span className="text-slate-300 font-medium">{u.name}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                {u.percentage >= 100 && <AlertCircle size={10} className="text-red-400" />}
+                <span className={`font-semibold ${u.percentage >= 100 ? 'text-red-400' : 'text-amber-400'}`}>
+                  {u.percentage.toFixed(0)}%
+                </span>
+              </div>
+            </div>
+            <div className="w-full h-1.5 bg-bg-elevated rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full ${progressColor(u.percentage)}`}
+                style={{ width: `${Math.min(u.percentage, 100)}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-xs text-slate-600 mt-0.5">
+              <span>{fmt(u.spent)} gastado</span>
+              <span>límite {fmt(u.limit)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { token } = useAuth();
   const [data, setData] = useState<DashboardOut | null>(null);
+  const [upcoming, setUpcoming] = useState<SubscriptionOut[]>([]);
+  const [budgetUsage, setBudgetUsage] = useState<BudgetUsage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchDashboard = () => {
     if (!token) return;
     setLoading(true);
-    api.dashboard.get(token)
-      .then(setData)
+    Promise.all([
+      api.dashboard.get(token),
+      api.subscriptions.upcoming(token, 7).catch(() => [] as SubscriptionOut[]),
+      api.budgets.usage(token).catch(() => [] as BudgetUsage[]),
+    ])
+      .then(([d, up, bu]) => { setData(d); setUpcoming(up); setBudgetUsage(bu); })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   };
@@ -83,14 +196,16 @@ export default function DashboardPage() {
 
       {/* Main grid */}
       <div className="grid xl:grid-cols-3 gap-6">
-        {/* Left: recent transactions + pie */}
+        {/* Left: charts + transactions */}
         <div className="xl:col-span-2 space-y-6">
           <SpendingPieChart categories={data?.top_categories ?? []} loading={loading} />
           <RecentTransactions transactions={data?.recent_transactions ?? []} loading={loading} />
         </div>
 
-        {/* Right: NLP chat */}
-        <div className="xl:col-span-1">
+        {/* Right: alerts + NLP chat */}
+        <div className="xl:col-span-1 space-y-6">
+          {!loading && <UpcomingSubscriptions subs={upcoming} />}
+          {!loading && <BudgetSummary usage={budgetUsage} />}
           <NLPChat onTransactionCreated={fetchDashboard} />
         </div>
       </div>

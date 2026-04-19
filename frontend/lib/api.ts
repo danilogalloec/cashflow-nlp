@@ -2,6 +2,13 @@ import type {
   AccountCreate,
   AccountOut,
   AccountUpdate,
+  BudgetCreate,
+  BudgetOut,
+  BudgetUpdate,
+  BudgetUsage,
+  CategoryCreate,
+  CategoryOut,
+  CategoryUpdate,
   DashboardOut,
   DistributionItem,
   IncomeSourceCreate,
@@ -111,6 +118,17 @@ export const api = {
       req<UserOut>('PATCH', '/auth/me', data, token),
   },
 
+  categories: {
+    list: (token: string) =>
+      req<CategoryOut[]>('GET', '/categories', undefined, token),
+    create: (token: string, data: CategoryCreate) =>
+      req<CategoryOut>('POST', '/categories', data, token),
+    update: (token: string, id: string, data: CategoryUpdate) =>
+      req<CategoryOut>('PATCH', `/categories/${id}`, data, token),
+    remove: (token: string, id: string) =>
+      req<void>('DELETE', `/categories/${id}`, undefined, token),
+  },
+
   accounts: {
     list: (token: string) =>
       req<AccountOut[]>('GET', '/accounts', undefined, token),
@@ -125,8 +143,11 @@ export const api = {
   transactions: {
     list: (
       token: string,
-      filters?: { account_id?: string; direction?: string; from_date?: string; to_date?: string; skip?: number; limit?: number },
+      filters?: { account_id?: string; direction?: string; from_date?: string; to_date?: string; search?: string; category_id?: string; skip?: number; limit?: number },
     ) => req<TransactionOut[]>('GET', `/transactions${qs(filters)}`, undefined, token),
+    exportCsv: (
+      filters?: { account_id?: string; direction?: string; from_date?: string; to_date?: string; search?: string; category_id?: string },
+    ) => `/api/v1/transactions/export${qs(filters)}`,
     create: (token: string, data: TransactionCreate) =>
       req<TransactionOut>('POST', '/transactions', data, token),
     parse: (token: string, text: string, execute = false) =>
@@ -156,12 +177,29 @@ export const api = {
   subscriptions: {
     list: (token: string) =>
       req<SubscriptionOut[]>('GET', '/subscriptions', undefined, token),
+    upcoming: (token: string, days = 7) =>
+      req<SubscriptionOut[]>('GET', `/subscriptions/upcoming${qs({ days })}`, undefined, token),
+    pay: (token: string, id: string) =>
+      req<TransactionOut>('POST', `/subscriptions/${id}/pay`, undefined, token),
     create: (token: string, data: SubscriptionCreate) =>
       req<SubscriptionOut>('POST', '/subscriptions', data, token),
     update: (token: string, id: string, data: SubscriptionUpdate) =>
       req<SubscriptionOut>('PATCH', `/subscriptions/${id}`, data, token),
     remove: (token: string, id: string) =>
       req<void>('DELETE', `/subscriptions/${id}`, undefined, token),
+  },
+
+  budgets: {
+    list: (token: string) =>
+      req<BudgetOut[]>('GET', '/budgets', undefined, token),
+    usage: (token: string, year?: number, month?: number) =>
+      req<BudgetUsage[]>('GET', `/budgets/usage${qs({ year, month })}`, undefined, token),
+    create: (token: string, data: BudgetCreate) =>
+      req<BudgetOut>('POST', '/budgets', data, token),
+    update: (token: string, id: string, data: BudgetUpdate) =>
+      req<BudgetOut>('PATCH', `/budgets/${id}`, data, token),
+    remove: (token: string, id: string) =>
+      req<void>('DELETE', `/budgets/${id}`, undefined, token),
   },
 
   reports: {

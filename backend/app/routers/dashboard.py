@@ -13,22 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.dependencies import get_current_user, get_db
-from app.models import Account, Category, IncomeFrequency, IncomeSource, Subscription, Transaction, TransactionDirection, TransactionStatus, User
+from app.models import Account, Category, Transaction, TransactionDirection, TransactionStatus, User
 from app.schemas.dashboard import AccountSummary, CategorySummary, DashboardOut, MonthSummary
 from app.schemas.transaction import TransactionOut
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 _ZERO = Decimal("0")
-
-_FREQ_MULT: dict[IncomeFrequency, Decimal] = {
-    IncomeFrequency.monthly:  Decimal("1"),
-    IncomeFrequency.annual:   Decimal("0.083333"),
-    IncomeFrequency.weekly:   Decimal("4.33"),
-    IncomeFrequency.biweekly: Decimal("2.17"),
-    IncomeFrequency.daily:    Decimal("30"),
-    IncomeFrequency.once:     Decimal("0"),
-}
 
 
 @router.get("", response_model=DashboardOut)
@@ -69,32 +60,6 @@ async def get_dashboard(
 
     income = monthly_row.income or _ZERO
     expense = monthly_row.expense or _ZERO
-
-    # 2b ── Fixed monthly income from active income sources
-    income_sources = (await db.scalars(
-        select(IncomeSource).where(
-            IncomeSource.user_id == uid,
-            IncomeSource.is_active.is_(True),
-        )
-    )).all()
-    fixed_monthly = sum(
-        (s.amount * _FREQ_MULT.get(s.frequency, Decimal("1")) for s in income_sources),
-        _ZERO,
-    )
-    income = income + fixed_monthly
-
-    # 2c ── Fixed monthly expense from active subscriptions
-    subscriptions = (await db.scalars(
-        select(Subscription).where(
-            Subscription.user_id == uid,
-            Subscription.is_active.is_(True),
-        )
-    )).all()
-    fixed_expense = sum(
-        (s.amount * _FREQ_MULT.get(s.frequency, Decimal("1")) for s in subscriptions),
-        _ZERO,
-    )
-    expense = expense + fixed_expense
 
     # 3 ── Top 5 expense categories this month
     cat_rows = (await db.execute(

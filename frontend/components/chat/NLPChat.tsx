@@ -6,11 +6,11 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Send, Mic, CheckCircle, XCircle, Loader2, Info } from 'lucide-react';
+import { Send, Mic, CheckCircle, XCircle, Loader2, ArrowUpRight, ArrowDownLeft, ArrowLeftRight } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
-import type { NLPParseOut, TransactionOut } from '@/lib/types';
+import type { NLPParseOut, TransactionDirection, TransactionOut } from '@/lib/types';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -20,46 +20,24 @@ type SuccessMsg   = { id: string; type: 'success'; tx: TransactionOut };
 type ErrorMsg     = { id: string; type: 'error'; text: string };
 type ChatMessage  = UserMessage | ParseMessage | SuccessMsg | ErrorMsg;
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 let _id = 0;
 const uid = () => String(++_id);
 
 const DIR_CONFIG = {
-  income:   { label: 'INGRESO',       cls: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25' },
-  expense:  { label: 'GASTO',         cls: 'text-red-400    bg-red-500/10    border-red-500/25'    },
-  transfer: { label: 'TRANSFERENCIA', cls: 'text-amber-400  bg-amber-500/10  border-amber-500/25'  },
+  income:   { label: 'Ingreso',        cls: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25', icon: ArrowDownLeft },
+  expense:  { label: 'Gasto',          cls: 'text-red-400    bg-red-500/10    border-red-500/25',       icon: ArrowUpRight },
+  transfer: { label: 'Transferencia',  cls: 'text-amber-400  bg-amber-500/10  border-amber-500/25',     icon: ArrowLeftRight },
 } as const;
 
 const PLACEHOLDERS = [
   'Gasté 85 en almuerzo hoy…',
   'Recibí mi sueldo de Q5,000…',
   'Transferí 200 de banco a efectivo…',
+  'Di $30 de regalo a la Pao…',
   'Pagué 45.50 en transporte…',
 ];
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function ConfidenceBar({ value }: { value: number }) {
-  const pct = Math.round(value * 100);
-  const color = pct >= 70 ? 'from-accent to-primary-light' : pct >= 50 ? 'from-amber-500 to-amber-400' : 'from-red-500 to-red-400';
-  return (
-    <div>
-      <div className="flex justify-between text-xs text-slate-500 mb-1">
-        <span>Confianza</span>
-        <span className={clsx('font-semibold', pct >= 70 ? 'text-accent-light' : pct >= 50 ? 'text-amber-400' : 'text-red-400')}>
-          {pct}%
-        </span>
-      </div>
-      <div className="h-1.5 bg-bg-border rounded-full overflow-hidden">
-        <div
-          className={clsx('h-full bg-gradient-to-r rounded-full transition-all duration-500', color)}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-    </div>
-  );
-}
+// ── ParseCard ─────────────────────────────────────────────────────────────────
 
 function ParseCard({
   msg,
@@ -67,30 +45,45 @@ function ParseCard({
   onDismiss,
 }: {
   msg: ParseMessage;
-  onConfirm: (msg: ParseMessage) => void;
+  onConfirm: (msg: ParseMessage, overrideDir?: TransactionDirection) => void;
   onDismiss: (id: string) => void;
 }) {
   const { result, confirmed } = msg;
-  const dir = result.direction ? DIR_CONFIG[result.direction] : null;
+  const [selectedDir, setSelectedDir] = useState<TransactionDirection | null>(result.direction ?? null);
   const pct = Math.round(result.confidence * 100);
-  const canAutoConfirm = pct >= 70 && !!result.amount && !!result.direction;
+
+  // Can confirm if we have amount + direction (either from parser or user selection)
+  const effectiveDir = selectedDir;
+  const canConfirm = !!result.amount && !!effectiveDir;
+  const dirCfg = effectiveDir ? DIR_CONFIG[effectiveDir] : null;
 
   return (
-    <div
-      className={clsx(
-        'rounded-2xl rounded-bl-sm border p-4 text-sm transition-all',
-        confirmed ? 'opacity-50 pointer-events-none' : 'bg-bg-elevated border-bg-border',
-      )}
-    >
-      {/* Direction badge */}
-      {dir ? (
-        <span className={clsx('inline-flex px-2 py-0.5 rounded border text-xs font-bold mb-3', dir.cls)}>
-          {dir.label}
+    <div className={clsx(
+      'rounded-2xl rounded-bl-sm border p-4 text-sm transition-all w-full',
+      confirmed ? 'opacity-50 pointer-events-none bg-bg-elevated border-bg-border' : 'bg-bg-elevated border-bg-border',
+    )}>
+      {/* Direction badge or selector */}
+      {dirCfg ? (
+        <span className={clsx('inline-flex items-center gap-1 px-2 py-0.5 rounded border text-xs font-bold mb-3', dirCfg.cls)}>
+          <dirCfg.icon size={10} />{dirCfg.label}
         </span>
       ) : (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border text-xs font-bold mb-3 text-slate-400 bg-slate-500/10 border-slate-500/20">
-          <Info size={10} /> Sin clasificar
-        </span>
+        <div className="mb-3">
+          <p className="text-xs text-slate-400 mb-2">¿Qué tipo de movimiento es?</p>
+          <div className="flex gap-1.5">
+            {(Object.entries(DIR_CONFIG) as [TransactionDirection, typeof DIR_CONFIG[TransactionDirection]][]).map(([key, cfg]) => (
+              <button
+                key={key}
+                onClick={() => setSelectedDir(key)}
+                className={clsx(
+                  'flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors',
+                  selectedDir === key ? cfg.cls : 'text-slate-400 bg-bg-border border-bg-border hover:text-white',
+                )}>
+                <cfg.icon size={11} />{cfg.label}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Amount */}
@@ -102,48 +95,55 @@ function ParseCard({
         <div className="text-slate-500 text-sm mb-1 italic">Monto no detectado</div>
       )}
 
-      {/* Metadata chips */}
-      <div className="flex flex-wrap gap-1.5 mb-3 text-xs">
-        {result.category_hint && (
-          <span className="px-2 py-0.5 rounded-md bg-primary-muted text-primary-light border border-primary/20">
-            📁 {result.category_hint}
-          </span>
-        )}
-        {result.account_type_hint && (
-          <span className="px-2 py-0.5 rounded-md bg-bg-border text-slate-300">
-            🏦 {result.account_type_hint}
-          </span>
-        )}
-        {result.to_account_type_hint && (
-          <span className="px-2 py-0.5 rounded-md bg-bg-border text-slate-300">
-            → 🏦 {result.to_account_type_hint}
-          </span>
-        )}
-        {result.transaction_date && (
-          <span className="px-2 py-0.5 rounded-md bg-bg-border text-slate-400">
-            📅 {result.transaction_date}
-          </span>
-        )}
-      </div>
+      {/* Description */}
+      {result.description && (
+        <p className="text-xs text-slate-500 mb-2 truncate">{result.description}</p>
+      )}
 
-      <ConfidenceBar value={result.confidence} />
+      {/* Metadata chips */}
+      {(result.category_hint || result.transaction_date) && (
+        <div className="flex flex-wrap gap-1.5 mb-3 text-xs">
+          {result.category_hint && (
+            <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary-light border border-primary/20">
+              📁 {result.category_hint}
+            </span>
+          )}
+          {result.transaction_date && (
+            <span className="px-2 py-0.5 rounded-md bg-bg-border text-slate-400">
+              📅 {result.transaction_date}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Confidence bar */}
+      <div className="mb-3">
+        <div className="flex justify-between text-xs text-slate-500 mb-1">
+          <span>Confianza del parser</span>
+          <span className={clsx('font-semibold', pct >= 70 ? 'text-emerald-400' : pct >= 50 ? 'text-amber-400' : 'text-red-400')}>
+            {pct}%
+          </span>
+        </div>
+        <div className="h-1.5 bg-bg-border rounded-full overflow-hidden">
+          <div
+            className={clsx('h-full rounded-full transition-all duration-500',
+              pct >= 70 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-400' : 'bg-red-500')}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
 
       {/* Actions */}
       {!confirmed && (
-        <div className="flex gap-2 mt-3">
-          {canAutoConfirm ? (
-            <button
-              onClick={() => onConfirm(msg)}
-              className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-white bg-accent hover:bg-accent-hover px-3 py-2 rounded-lg transition-colors"
-            >
-              <CheckCircle size={13} />
-              Registrar ahora
-            </button>
-          ) : (
-            <span className="flex-1 text-xs text-slate-500 py-2 px-3 bg-bg-border/50 rounded-lg text-center">
-              Confianza baja — edita y reenvía
-            </span>
-          )}
+        <div className="flex gap-2">
+          <button
+            onClick={() => onConfirm(msg, effectiveDir ?? undefined)}
+            disabled={!canConfirm}
+            className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-white bg-primary hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed px-3 py-2 rounded-lg transition-colors"
+          >
+            <CheckCircle size={13} />
+            Registrar
+          </button>
           <button
             onClick={() => onDismiss(msg.id)}
             className="p-2 rounded-lg border border-bg-border text-slate-500 hover:text-red-400 hover:border-red-500/30 transition-colors"
@@ -154,9 +154,8 @@ function ParseCard({
       )}
 
       {confirmed && (
-        <div className="flex items-center gap-1.5 text-xs text-emerald-400 mt-3">
-          <CheckCircle size={12} />
-          Registrado
+        <div className="flex items-center gap-1.5 text-xs text-emerald-400">
+          <CheckCircle size={12} />Registrado
         </div>
       )}
     </div>
@@ -178,7 +177,6 @@ export default function NLPChat({ onTransactionCreated }: NLPChatProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Cycle placeholder
   useEffect(() => {
     let i = 0;
     const t = setInterval(() => {
@@ -212,18 +210,35 @@ export default function NLPChat({ onTransactionCreated }: NLPChatProps) {
     }
   }, [input, isLoading, token]);
 
-  const handleConfirm = useCallback(async (parseMsg: ParseMessage) => {
+  const handleConfirm = useCallback(async (parseMsg: ParseMessage, overrideDir?: TransactionDirection) => {
     if (!token) return;
     setIsLoading(true);
 
+    // If user selected a direction manually, patch it into the raw_text before re-parsing with execute
+    // We send the original text but force execute=true; for overrideDir we create the transaction directly
     try {
-      const result = await api.transactions.parse(token, parseMsg.result.raw_text, true);
-      // Mark parse message as confirmed
+      let tx: TransactionOut | null = null;
+
+      if (overrideDir && overrideDir !== parseMsg.result.direction) {
+        // Build a patched text so the parser detects the correct direction
+        const dirPrefix: Record<TransactionDirection, string> = {
+          expense: 'gasté ',
+          income: 'recibí ',
+          transfer: 'transferí ',
+        };
+        const patchedText = dirPrefix[overrideDir] + parseMsg.result.raw_text;
+        const result = await api.transactions.parse(token, patchedText, true);
+        tx = result.transaction ?? null;
+      } else {
+        const result = await api.transactions.parse(token, parseMsg.result.raw_text, true);
+        tx = result.transaction ?? null;
+      }
+
       setMessages(prev => prev.map(m =>
         m.id === parseMsg.id ? ({ ...m, confirmed: true } as ParseMessage) : m,
       ));
-      if (result.transaction) {
-        setMessages(prev => [...prev, { id: uid(), type: 'success', tx: result.transaction! }]);
+      if (tx) {
+        setMessages(prev => [...prev, { id: uid(), type: 'success', tx }]);
         onTransactionCreated?.();
       }
     } catch (err) {
@@ -254,10 +269,10 @@ export default function NLPChat({ onTransactionCreated }: NLPChatProps) {
         </div>
         <div>
           <p className="text-sm font-semibold text-white">Asistente de Gastos</p>
-          <p className="text-xs text-slate-500">NLP en español · Escribe o dicta</p>
+          <p className="text-xs text-slate-500">NLP en español · Escribe naturalmente</p>
         </div>
         <div className="ml-auto flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           <span className="text-xs text-slate-500">En línea</span>
         </div>
       </div>
@@ -268,9 +283,17 @@ export default function NLPChat({ onTransactionCreated }: NLPChatProps) {
           <div className="h-full flex flex-col items-center justify-center text-center px-6">
             <div className="text-4xl mb-4">💬</div>
             <p className="text-sm font-medium text-slate-300 mb-2">¿Qué movimiento registramos hoy?</p>
-            <p className="text-xs text-slate-500">
-              Escribe algo como &quot;Gasté 50 en comida&quot; o &quot;Recibí mi sueldo&quot;
+            <p className="text-xs text-slate-500 mb-4">
+              Escribe de forma natural, por ejemplo:
             </p>
+            <div className="space-y-1.5 w-full">
+              {['Gasté 85 en almuerzo', 'Recibí mi sueldo de Q5,000', 'Di $30 de regalo a la Pao'].map(ex => (
+                <button key={ex} onClick={() => setInput(ex)}
+                  className="w-full text-left text-xs px-3 py-2 bg-bg-elevated border border-bg-border rounded-lg text-slate-400 hover:text-white hover:border-primary/30 transition-colors">
+                  &quot;{ex}&quot;
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -287,15 +310,17 @@ export default function NLPChat({ onTransactionCreated }: NLPChatProps) {
 
           if (msg.type === 'parse') {
             return (
-              <div key={msg.id} className="flex justify-start max-w-[90%]">
-                <ParseCard msg={msg} onConfirm={handleConfirm} onDismiss={handleDismiss} />
+              <div key={msg.id} className="flex justify-start w-full">
+                <div className="w-full max-w-[92%]">
+                  <ParseCard msg={msg} onConfirm={handleConfirm} onDismiss={handleDismiss} />
+                </div>
               </div>
             );
           }
 
           if (msg.type === 'success') {
             return (
-              <div key={msg.id} className="flex justify-start animate-slide-up">
+              <div key={msg.id} className="flex justify-start">
                 <div className="flex items-start gap-2 px-4 py-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl rounded-bl-sm max-w-[85%]">
                   <CheckCircle size={15} className="text-emerald-400 flex-shrink-0 mt-0.5" />
                   <div>

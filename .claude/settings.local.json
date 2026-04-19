@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(alembic upgrade *)"
+      "Bash(alembic upgrade *)",
+      "Bash(python3 -c ' *)",
+      "Bash(npx tsc *)",
+      "Bash(python3 -c \"from app.nlp import parser; print\\('OK'\\)\")",
+      "Bash(python3 *)",
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Bash(python -m alembic upgrade head)"
     ]
   }
 }

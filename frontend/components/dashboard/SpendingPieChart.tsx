@@ -3,24 +3,26 @@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import type { CategorySummary } from '@/lib/types';
 
-const FALLBACK_COLORS = ['#7C3AED', '#10B981', '#F59E0B', '#EF4444', '#3B82F6'];
+const FALLBACK_COLORS = ['#7C3AED', '#10B981', '#F59E0B', '#EF4444', '#3B82F6', '#EC4899', '#14B8A6', '#F97316'];
 
 interface Props {
   categories: CategorySummary[];
   loading?: boolean;
+  title?: string;
+  emptyMessage?: string;
 }
 
-export default function SpendingPieChart({ categories, loading }: Props) {
+export default function SpendingPieChart({ categories, loading, title = 'Distribución de Gastos', emptyMessage = 'Sin datos este mes' }: Props) {
   const data = categories.map((c, i) => ({
     name: c.category_name,
     value: parseFloat(c.total),
-    color: FALLBACK_COLORS[i % FALLBACK_COLORS.length],
+    color: (c as CategorySummary & { color?: string }).color ?? FALLBACK_COLORS[i % FALLBACK_COLORS.length],
     count: c.count,
   }));
 
   return (
     <div className="bg-bg-surface border border-bg-border rounded-2xl p-5">
-      <h2 className="text-sm font-semibold text-slate-300 mb-4">Distribución de Gastos</h2>
+      <h2 className="text-sm font-semibold text-slate-300 mb-4">{title}</h2>
 
       {loading && (
         <div className="h-48 flex items-center justify-center">
@@ -29,8 +31,10 @@ export default function SpendingPieChart({ categories, loading }: Props) {
       )}
 
       {!loading && data.length === 0 && (
-        <div className="h-48 flex items-center justify-center text-slate-500 text-sm">
-          Sin datos este mes
+        <div className="h-48 flex flex-col items-center justify-center text-slate-500 text-sm text-center px-4 gap-1">
+          {emptyMessage.split('\n').map((line, i) => (
+            <p key={i} className={i === 0 ? 'font-medium' : 'text-xs text-slate-600'}>{line}</p>
+          ))}
         </div>
       )}
 
@@ -53,13 +57,16 @@ export default function SpendingPieChart({ categories, loading }: Props) {
               </Pie>
               <Tooltip
                 contentStyle={{
-                  background: '#18182A',
-                  border: '1px solid #252540',
+                  background: '#1e1e30',
+                  border: '1px solid #4a4a6a',
                   borderRadius: 8,
                   fontSize: 12,
+                  color: '#e2e8f0',
                 }}
-                formatter={(v: number) =>
-                  [`$${v.toFixed(2)}`, '']
+                itemStyle={{ color: '#e2e8f0' }}
+                labelStyle={{ color: '#94a3b8', marginBottom: 2 }}
+                formatter={(v: number, name: string) =>
+                  [`$${v.toFixed(2)}`, name]
                 }
               />
               <Legend

@@ -15,6 +15,7 @@ class SubscriptionCreate(BaseModel):
     currency: CurrencyCode = CurrencyCode.USD
     frequency: IncomeFrequency = IncomeFrequency.monthly
     next_due: date | None = None
+    end_date: date | None = None
     category_id: uuid.UUID | None = None
     account_id: uuid.UUID | None = None
     notes: str | None = None
@@ -30,6 +31,7 @@ class SubscriptionUpdate(BaseModel):
     amount: Decimal | None = Field(default=None, gt=0)
     frequency: IncomeFrequency | None = None
     next_due: date | None = None
+    end_date: date | None = None
     category_id: uuid.UUID | None = None
     account_id: uuid.UUID | None = None
     is_active: bool | None = None
@@ -45,6 +47,7 @@ class SubscriptionOut(BaseModel):
     currency: CurrencyCode
     frequency: IncomeFrequency
     next_due: date | None
+    end_date: date | None
     category_id: uuid.UUID | None
     account_id: uuid.UUID | None
     is_active: bool

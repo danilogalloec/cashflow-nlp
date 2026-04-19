@@ -8,6 +8,8 @@ from slowapi.util import get_remote_address
 from app.core.config import settings
 from app.routers import auth as auth_router
 from app.routers import accounts as accounts_router
+from app.routers import budgets as budgets_router
+from app.routers import categories as categories_router
 from app.routers import transactions as transactions_router
 from app.routers import dashboard as dashboard_router
 from app.routers import income_sources as income_router
@@ -38,6 +40,8 @@ app.add_middleware(
 _V1 = "/api/v1"
 app.include_router(auth_router.router,         prefix=_V1)
 app.include_router(accounts_router.router,     prefix=_V1)
+app.include_router(budgets_router.router,      prefix=_V1)
+app.include_router(categories_router.router,   prefix=_V1)
 app.include_router(transactions_router.router, prefix=_V1)
 app.include_router(dashboard_router.router,    prefix=_V1)
 app.include_router(income_router.router,        prefix=_V1)

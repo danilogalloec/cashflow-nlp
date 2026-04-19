@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import csv
+import io
 import uuid
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -23,12 +26,69 @@ from app.services import transaction_service as svc
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 
+@router.get("/export")
+async def export_transactions(
+    account_id: uuid.UUID | None = None,
+    direction: TransactionDirection | None = None,
+    from_date: date | None = None,
+    to_date: date | None = None,
+    search: str | None = Query(None, max_length=200),
+    category_id: uuid.UUID | None = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    q = (
+        select(Transaction)
+        .where(Transaction.user_id == current_user.id)
+        .options(selectinload(Transaction.category), selectinload(Transaction.account))
+        .order_by(Transaction.transaction_date.desc(), Transaction.created_at.desc())
+    )
+    if account_id:
+        q = q.where(Transaction.account_id == account_id)
+    if direction:
+        q = q.where(Transaction.direction == direction)
+    if from_date:
+        q = q.where(Transaction.transaction_date >= from_date)
+    if to_date:
+        q = q.where(Transaction.transaction_date <= to_date)
+    if search:
+        q = q.where(Transaction.description.ilike(f"%{search}%"))
+    if category_id:
+        q = q.where(Transaction.category_id == category_id)
+
+    transactions = (await db.scalars(q)).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Fecha", "Descripción", "Categoría", "Tipo", "Cuenta", "Monto", "Moneda", "Estado"])
+    for tx in transactions:
+        writer.writerow([
+            tx.transaction_date,
+            tx.description or "",
+            tx.category.name if tx.category else "",
+            tx.direction,
+            tx.account.name if tx.account else "",
+            tx.amount,
+            tx.currency,
+            tx.status,
+        ])
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=transacciones.csv"},
+    )
+
+
 @router.get("", response_model=list[TransactionOut])
 async def list_transactions(
     account_id: uuid.UUID | None = None,
     direction: TransactionDirection | None = None,
     from_date: date | None = None,
     to_date: date | None = None,
+    search: str | None = Query(None, max_length=200),
+    category_id: uuid.UUID | None = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     current_user: User = Depends(get_current_user),
@@ -50,6 +110,10 @@ async def list_transactions(
         q = q.where(Transaction.transaction_date >= from_date)
     if to_date:
         q = q.where(Transaction.transaction_date <= to_date)
+    if search:
+        q = q.where(Transaction.description.ilike(f"%{search}%"))
+    if category_id:
+        q = q.where(Transaction.category_id == category_id)
 
     return (await db.scalars(q)).all()
 
@@ -70,10 +134,6 @@ async def parse_natural_language(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Parse a free-text finance statement in Spanish/English.
-    Pass ?execute=true to automatically create the transaction if confidence ≥ 0.7.
-    """
     result = nlp_parser.parse(payload.text)
 
     created_tx = None
@@ -146,7 +206,6 @@ async def delete_transaction(
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 async def _resolve_account(db: AsyncSession, user_id: uuid.UUID, type_hint: str | None) -> Account:
-    """Return first active account matching the type hint, or first available."""
     q = select(Account).where(Account.user_id == user_id, Account.is_active.is_(True))
     if type_hint:
         try:

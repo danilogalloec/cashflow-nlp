@@ -139,6 +139,7 @@ def _build_tx(user_id: uuid.UUID, payload: TransactionCreate) -> Transaction:
         category_id=payload.category_id,
         income_source_id=payload.income_source_id,
         subscription_id=payload.subscription_id,
+        installments=payload.installments,
         transaction_date=payload.transaction_date,
         status=TransactionStatus.completed,
         input_method=payload.input_method,

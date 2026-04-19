@@ -90,6 +90,7 @@ class User(Base):
     income_sources: Mapped[list[IncomeSource]] = relationship(back_populates="user", cascade="all, delete-orphan")
     subscriptions: Mapped[list[Subscription]] = relationship(back_populates="user", cascade="all, delete-orphan")
     transactions: Mapped[list[Transaction]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    budgets: Mapped[list[Budget]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class RefreshToken(Base):
@@ -119,6 +120,7 @@ class Category(Base):
 
     user: Mapped[User] = relationship(back_populates="categories")
     transactions: Mapped[list[Transaction]] = relationship(back_populates="category")
+    budgets: Mapped[list[Budget]] = relationship(back_populates="category")
 
 
 class Account(Base):
@@ -196,6 +198,7 @@ class Transaction(Base):
     status: Mapped[TransactionStatus] = mapped_column(Enum(TransactionStatus, name="transaction_status"), default=TransactionStatus.completed, nullable=False)
     input_method: Mapped[InputMethod] = mapped_column(Enum(InputMethod, name="input_method"), default=InputMethod.manual, nullable=False)
     raw_input: Mapped[str | None] = mapped_column(Text)
+    installments: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     transaction_date: Mapped[date] = mapped_column(Date, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False)
@@ -218,6 +221,7 @@ class Subscription(Base):
     currency: Mapped[CurrencyCode] = mapped_column(Enum(CurrencyCode, name="currency_code"), default=CurrencyCode.USD, nullable=False)
     frequency: Mapped[IncomeFrequency] = mapped_column(Enum(IncomeFrequency, name="income_frequency"), default=IncomeFrequency.monthly, nullable=False)
     next_due: Mapped[date | None] = mapped_column(Date, nullable=True)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     category_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
     account_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
@@ -227,3 +231,20 @@ class Subscription(Base):
 
     user: Mapped[User] = relationship(back_populates="subscriptions")
     category: Mapped[Category | None] = relationship()
+
+
+class Budget(Base):
+    __tablename__ = "budgets"
+    __table_args__ = (UniqueConstraint("user_id", "category_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    category_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("categories.id", ondelete="CASCADE"), nullable=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False)
+
+    user: Mapped[User] = relationship(back_populates="budgets")
+    category: Mapped[Category | None] = relationship(back_populates="budgets")

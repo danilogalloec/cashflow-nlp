@@ -9,6 +9,8 @@ import {
   TrendingUp,
   BarChart3,
   RefreshCw,
+  Tag,
+  Target,
   LogOut,
   ChevronRight,
   Settings,
@@ -21,9 +23,11 @@ const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/accounts', label: 'Cuentas', icon: Wallet },
   { href: '/transactions', label: 'Transacciones', icon: ArrowLeftRight },
-  { href: '/income', label: 'Ingresos', icon: TrendingUp },
-  { href: '/reports', label: 'Reportes', icon: BarChart3 },
   { href: '/subscriptions', label: 'Suscripciones', icon: RefreshCw },
+  { href: '/budgets', label: 'Presupuestos', icon: Target },
+  { href: '/income', label: 'Ingresos', icon: TrendingUp },
+  { href: '/categories', label: 'Categorías', icon: Tag },
+  { href: '/reports', label: 'Reportes', icon: BarChart3 },
   { href: '/profile', label: 'Perfil', icon: User },
 ];
 

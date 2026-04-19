@@ -27,6 +27,7 @@ class TransactionCreate(BaseModel):
     subscription_id: uuid.UUID | None = None
     to_account_id: uuid.UUID | None = None
     transaction_date: date = Field(default_factory=date.today)
+    installments: int | None = Field(default=None, ge=2, le=360)
     input_method: InputMethod = InputMethod.manual
     raw_input: str | None = None
 
@@ -54,6 +55,7 @@ class TransactionOut(BaseModel):
     description: str | None
     status: TransactionStatus
     input_method: InputMethod
+    installments: int | None
     transaction_date: date
     created_at: datetime
 
@@ -63,6 +65,7 @@ class TransactionUpdate(BaseModel):
     notes: str | None = None
     category_id: uuid.UUID | None = None
     subscription_id: uuid.UUID | None = None
+    installments: int | None = Field(default=None, ge=2, le=360)
     transaction_date: date | None = None
 
 

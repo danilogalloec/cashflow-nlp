@@ -103,12 +103,13 @@ export default function ReportsPage() {
       .finally(() => setLoadingTrends(false));
   }, [token, months]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // SpendingPieChart expects CategorySummary format
+  // SpendingPieChart expects CategorySummary format (color passed as extra field)
   const categories = distribution.map(d => ({
     category_id: d.category_id,
     category_name: d.category_name,
     total: d.amount,
     count: d.count,
+    color: d.color,
   }));
 
   return (
@@ -142,7 +143,16 @@ export default function ReportsPage() {
               ))}
             </div>
           </div>
-          <SpendingPieChart categories={categories} loading={loadingDist} />
+          <SpendingPieChart
+            categories={categories}
+            loading={loadingDist}
+            title={dirFilter === 'expense' ? 'Distribución de Gastos' : 'Distribución de Ingresos'}
+            emptyMessage={
+              dirFilter === 'income'
+                ? 'Sin ingresos registrados este mes.\nRegistra una transacción de tipo "Ingreso" para verlos aquí.'
+                : 'Sin gastos registrados este mes.'
+            }
+          />
         </div>
 
         {/* Trends */}

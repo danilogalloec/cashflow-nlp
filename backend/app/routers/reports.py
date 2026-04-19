@@ -48,13 +48,13 @@ async def get_distribution(
 
     rows = (await db.execute(
         select(
-            Category.id.label("category_id"),
-            Category.name.label("category_name"),
+            Transaction.category_id.label("category_id"),
+            func.coalesce(Category.name, "Sin categoría").label("category_name"),
             func.coalesce(Category.color, _FALLBACK_COLOR).label("color"),
             func.sum(Transaction.amount).label("amount"),
             func.count(Transaction.id).label("count"),
         )
-        .join(Transaction, Transaction.category_id == Category.id)
+        .outerjoin(Category, Transaction.category_id == Category.id)
         .where(
             Transaction.user_id == current_user.id,
             Transaction.direction == direction,
@@ -62,7 +62,7 @@ async def get_distribution(
             extract("year", Transaction.transaction_date) == y,
             extract("month", Transaction.transaction_date) == m,
         )
-        .group_by(Category.id, Category.name, Category.color)
+        .group_by(Transaction.category_id, Category.name, Category.color)
         .order_by(func.sum(Transaction.amount).desc())
     )).all()
 
