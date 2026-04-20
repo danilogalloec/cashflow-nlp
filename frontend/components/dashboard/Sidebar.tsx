@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Tag,
   Target,
+  ShieldCheck,
   LogOut,
   ChevronRight,
   Settings,
@@ -20,21 +21,25 @@ import { clsx } from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
 
 const NAV = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/accounts', label: 'Cuentas', icon: Wallet },
-  { href: '/transactions', label: 'Transacciones', icon: ArrowLeftRight },
-  { href: '/subscriptions', label: 'Suscripciones', icon: RefreshCw },
-  { href: '/budgets', label: 'Presupuestos', icon: Target },
-  { href: '/income', label: 'Ingresos', icon: TrendingUp },
-  { href: '/categories', label: 'Categorías', icon: Tag },
-  { href: '/reports', label: 'Reportes', icon: BarChart3 },
-  { href: '/profile', label: 'Perfil', icon: User },
+  { href: '/dashboard',     label: 'Dashboard',          icon: LayoutDashboard },
+  { href: '/accounts',      label: 'Cuentas',             icon: Wallet },
+  { href: '/transactions',  label: 'Transacciones',       icon: ArrowLeftRight },
+  { href: '/income',        label: 'Ingresos frecuentes', icon: TrendingUp },
+  { href: '/subscriptions', label: 'Gastos frecuentes',   icon: RefreshCw },
+  { href: '/budgets',       label: 'Presupuestos',        icon: Target },
+  { href: '/categories',    label: 'Categorías',          icon: Tag },
+  { href: '/reports',       label: 'Reportes',            icon: BarChart3 },
+  { href: '/profile',       label: 'Perfil',              icon: User },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
+
+  const NAV_EXTRA = user?.is_admin
+    ? [{ href: '/admin', label: 'Administrador', icon: ShieldCheck }]
+    : [];
 
   const handleLogout = async () => {
     await logout();
@@ -53,7 +58,7 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {[...NAV, ...NAV_EXTRA].map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(`${href}/`);
           return (
             <Link

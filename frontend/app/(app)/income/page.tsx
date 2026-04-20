@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, TrendingUp, Loader2, AlertCircle, X, CheckCircle, Calendar, Pencil } from 'lucide-react';
+import { Plus, TrendingUp, Loader2, AlertCircle, X, CheckCircle, Calendar, Pencil, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { api, ApiError } from '@/lib/api';
 import type { AccountOut, IncomeSourceOut, IncomeSourceCreate, CurrencyCode, IncomeFrequency } from '@/lib/types';
@@ -209,6 +209,20 @@ export default function IncomePage() {
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<IncomeSourceOut | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const handleDelete = async (id: string) => {
+    if (!token) return;
+    setDeleting(id);
+    try {
+      await api.income.remove(token, id);
+      setSources(prev => prev.filter(s => s.id !== id));
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Error al eliminar');
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   const load = () => {
     if (!token) return;
@@ -318,11 +332,19 @@ export default function IncomePage() {
                     </span>
                   </td>
                   <td className="px-5 py-4 text-center">
-                    <button onClick={() => setEditing(src)}
-                      className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
-                      title="Editar">
-                      <Pencil size={14} />
-                    </button>
+                    <div className="flex items-center justify-center gap-1">
+                      <button onClick={() => setEditing(src)}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                        title="Editar">
+                        <Pencil size={14} />
+                      </button>
+                      <button onClick={() => handleDelete(src.id)}
+                        disabled={deleting === src.id}
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                        title="Eliminar">
+                        {deleting === src.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

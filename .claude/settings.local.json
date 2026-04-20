@@ -7,7 +7,15 @@
       "Bash(python3 -c \"from app.nlp import parser; print\\('OK'\\)\")",
       "Bash(python3 *)",
       "Bash(./node_modules/.bin/tsc --noEmit)",
-      "Bash(python -m alembic upgrade head)"
+      "Bash(python -m alembic upgrade head)",
+      "Bash(pip show *)",
+      "Bash(pip install *)",
+      "Bash(psql *)",
+      "Bash(curl *)",
+      "Bash(python -)",
+      "Bash(PGPASSWORD=changeme psql *)",
+      "Bash(redis-cli keys *)",
+      "Bash(redis-cli *)"
     ]
   }
 }

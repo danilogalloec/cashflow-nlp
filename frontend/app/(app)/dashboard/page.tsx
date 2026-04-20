@@ -161,6 +161,24 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {!loading && data && data.accounts.length === 0 && (
+        <div className="mb-8 flex items-center gap-4 px-5 py-4 bg-primary/10 border border-primary/25 rounded-2xl">
+          <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+            <Wallet size={18} className="text-primary-light" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-white">Crea tu primera cuenta</p>
+            <p className="text-xs text-slate-400 mt-0.5">Sin una cuenta las demás secciones no funcionan. Agrega efectivo, banco o tarjeta.</p>
+          </div>
+          <Link
+            href="/accounts"
+            className="flex-shrink-0 bg-primary hover:bg-primary-hover text-white text-xs font-semibold px-4 py-2 rounded-xl transition-colors"
+          >
+            Crear cuenta →
+          </Link>
+        </div>
+      )}
+
       {/* Stat cards */}
       <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
         <StatCard

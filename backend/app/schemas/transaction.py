@@ -71,6 +71,7 @@ class TransactionUpdate(BaseModel):
 
 class NLPParseIn(BaseModel):
     text: str = Field(min_length=2, max_length=500)
+    transaction_date: date | None = None
 
 
 @dataclass

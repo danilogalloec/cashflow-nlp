@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { BarChart3, TrendingUp, TrendingDown, Minus, Loader2, AlertCircle } from 'lucide-react';
+import { BarChart3, TrendingUp, TrendingDown, Minus, Loader2, AlertCircle, Target } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
-import type { DistributionItem, TrendItem } from '@/lib/types';
+import type { DistributionItem, TrendItem, BudgetUsage } from '@/lib/types';
 import SpendingPieChart from '@/components/dashboard/SpendingPieChart';
 
 function fmt(value: string) {
@@ -79,8 +79,10 @@ export default function ReportsPage() {
   const { token } = useAuth();
   const [distribution, setDistribution] = useState<DistributionItem[]>([]);
   const [trends, setTrends] = useState<TrendItem[]>([]);
+  const [budgetUsage, setBudgetUsage] = useState<BudgetUsage[]>([]);
   const [loadingDist, setLoadingDist] = useState(true);
   const [loadingTrends, setLoadingTrends] = useState(true);
+  const [loadingBudget, setLoadingBudget] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [months, setMonths] = useState(6);
   const [dirFilter, setDirFilter] = useState<'expense' | 'income'>('expense');
@@ -102,6 +104,15 @@ export default function ReportsPage() {
       .catch(e => setError(e.message))
       .finally(() => setLoadingTrends(false));
   }, [token, months]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!token) return;
+    setLoadingBudget(true);
+    api.budgets.usage(token)
+      .then(setBudgetUsage)
+      .catch(() => setBudgetUsage([]))
+      .finally(() => setLoadingBudget(false));
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // SpendingPieChart expects CategorySummary format (color passed as extra field)
   const categories = distribution.map(d => ({
@@ -129,7 +140,7 @@ export default function ReportsPage() {
         {/* Distribution */}
         <div className="bg-bg-surface border border-bg-border rounded-2xl p-5">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-base font-semibold text-white">Distribución por categoría</h2>
+            <h2 className="text-base font-semibold text-white">Distribución por categoría del mes</h2>
             <div className="flex gap-1.5">
               {(['expense', 'income'] as const).map(d => (
                 <button key={d} onClick={() => setDirFilter(d)}
@@ -158,7 +169,7 @@ export default function ReportsPage() {
         {/* Trends */}
         <div className="bg-bg-surface border border-bg-border rounded-2xl p-5">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-base font-semibold text-white">Tendencias mensuales</h2>
+            <h2 className="text-base font-semibold text-white">Balances mensuales</h2>
             <div className="flex gap-1.5">
               {([3, 6, 12] as const).map(m => (
                 <button key={m} onClick={() => setMonths(m)}
@@ -215,6 +226,67 @@ export default function ReportsPage() {
             </table>
           </div>
         )}
+
+        {/* Budget vs Real */}
+        <div className="xl:col-span-2 bg-bg-surface border border-bg-border rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-bg-border flex items-center gap-2">
+            <Target size={15} className="text-primary-light" />
+            <h2 className="text-base font-semibold text-white">Presupuesto vs Real (mes actual)</h2>
+          </div>
+          {loadingBudget ? (
+            <div className="flex items-center justify-center py-12 text-slate-500">
+              <Loader2 size={18} className="animate-spin mr-2" />Cargando…
+            </div>
+          ) : budgetUsage.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+              <Target size={32} className="mb-3 opacity-30" />
+              <p className="text-sm">Sin presupuestos definidos</p>
+              <p className="text-xs mt-1">Crea presupuestos en la sección Presupuestos o al crear una categoría</p>
+            </div>
+          ) : (
+            <div className="p-5 space-y-4">
+              {budgetUsage.map(u => {
+                const pct = Math.min(u.percentage, 100);
+                const over = u.percentage > 100;
+                const near = u.percentage >= 80 && u.percentage <= 100;
+                const barColor = over ? 'bg-red-500' : near ? 'bg-amber-400' : 'bg-emerald-500';
+                const textColor = over ? 'text-red-400' : near ? 'text-amber-400' : 'text-emerald-400';
+                return (
+                  <div key={u.budget_id}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        {u.category_color && (
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: u.category_color }} />
+                        )}
+                        <span className="text-sm font-medium text-white">{u.name}</span>
+                        {u.category_name && u.category_name !== u.name && (
+                          <span className="text-xs text-slate-500">{u.category_name}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs">
+                        <span className="text-slate-400">
+                          {fmt(String(u.spent))} <span className="text-slate-600">/ {fmt(String(u.limit))}</span>
+                        </span>
+                        <span className={`font-bold tabular-nums w-12 text-right ${textColor}`}>
+                          {u.percentage.toFixed(0)}%
+                        </span>
+                      </div>
+                    </div>
+                    <div className="w-full h-2.5 bg-bg-elevated rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                        style={{ width: `${pct}%` }} />
+                    </div>
+                    {over && (
+                      <p className="text-xs text-red-400 mt-1">
+                        Excedido por {fmt(String(parseFloat(String(u.spent)) - parseFloat(String(u.limit))))}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

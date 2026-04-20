@@ -51,6 +51,7 @@ async def register(db: AsyncSession, payload: UserRegisterIn) -> TokenPair:
     await db.flush()  # get user.id before seeding categories
 
     await _seed_default_categories(db, user.id)
+    await _create_welcome_notification(db, user.id)
 
     raw_rt, rt_hash = create_refresh_token()
     db.add(RefreshToken(
@@ -62,6 +63,11 @@ async def register(db: AsyncSession, payload: UserRegisterIn) -> TokenPair:
     await db.commit()
 
     access_token = create_access_token(user.id)
+
+    import asyncio
+    from app import email as mail_service
+    asyncio.ensure_future(mail_service.send_welcome(user.email, user.name))
+
     return TokenPair(access_token=access_token, refresh_token=raw_rt, token_type="bearer")
 
 
@@ -170,3 +176,14 @@ async def _seed_default_categories(db: AsyncSession, user_id: uuid.UUID) -> None
 
     for name, color, icon in _DEFAULT_CATEGORIES:
         db.add(Category(user_id=user_id, name=name, color=color, icon=icon, is_system=True))
+
+
+async def _create_welcome_notification(db: AsyncSession, user_id: uuid.UUID) -> None:
+    from app.models import Notification, NotificationType
+
+    db.add(Notification(
+        user_id=user_id,
+        title="¡Bienvenido a CashFlow!",
+        body="Tu cuenta está lista. Empieza registrando tus cuentas y transacciones para ver tu resumen financiero.",
+        type=NotificationType.welcome,
+    ))

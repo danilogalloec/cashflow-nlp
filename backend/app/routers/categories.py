@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, get_db
-from app.models import Category, User
+from app.models import Budget, Category, User
 from app.schemas.category import CategoryCreate, CategoryOut, CategoryUpdate
 
 router = APIRouter(prefix="/categories", tags=["categories"])
@@ -43,6 +43,16 @@ async def create_category(
 
     cat = Category(user_id=current_user.id, **payload.model_dump())
     db.add(cat)
+    await db.flush()
+
+    if payload.monthly_budget and payload.monthly_budget > 0:
+        db.add(Budget(
+            user_id=current_user.id,
+            category_id=cat.id,
+            name=cat.name,
+            amount=payload.monthly_budget,
+        ))
+
     await db.commit()
     await db.refresh(cat)
     return cat
@@ -58,6 +68,28 @@ async def update_category(
     cat = await _get_or_404(db, category_id, current_user.id)
     for attr, value in payload.model_dump(exclude_none=True).items():
         setattr(cat, attr, value)
+
+    if payload.monthly_budget is not None:
+        budget = await db.scalar(
+            select(Budget).where(
+                Budget.user_id == current_user.id,
+                Budget.category_id == cat.id,
+            )
+        )
+        if payload.monthly_budget > 0:
+            if budget:
+                budget.amount = payload.monthly_budget
+                budget.name = payload.name or cat.name
+            else:
+                db.add(Budget(
+                    user_id=current_user.id,
+                    category_id=cat.id,
+                    name=cat.name,
+                    amount=payload.monthly_budget,
+                ))
+        elif budget:
+            await db.delete(budget)
+
     await db.commit()
     await db.refresh(cat)
     return cat

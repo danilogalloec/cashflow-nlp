@@ -153,7 +153,7 @@ async def parse_natural_language(
             currency=result.currency,
             description=result.description,
             category_id=category_id,
-            transaction_date=result.transaction_date or date.today(),
+            transaction_date=payload.transaction_date or result.transaction_date or date.today(),
             input_method="text_nlp",
             raw_input=payload.text,
         )
@@ -223,7 +223,17 @@ async def _resolve_account(db: AsyncSession, user_id: uuid.UUID, type_hint: str 
 async def _resolve_category(db: AsyncSession, user_id: uuid.UUID, hint: str | None) -> uuid.UUID | None:
     if not hint:
         return None
+    from sqlalchemy import func as _func
     cat = await db.scalar(
-        select(Category).where(Category.user_id == user_id, Category.name == hint)
+        select(Category).where(
+            Category.user_id == user_id,
+            _func.lower(Category.name) == hint.lower(),
+        )
     )
-    return cat.id if cat else None
+    if cat:
+        return cat.id
+    # Auto-create the category so the hint is never silently dropped
+    new_cat = Category(user_id=user_id, name=hint, is_system=False)
+    db.add(new_cat)
+    await db.flush()
+    return new_cat.id

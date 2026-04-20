@@ -7,24 +7,32 @@ export type InputMethod = 'manual' | 'voice' | 'text_nlp' | 'import';
 export type IncomeFrequency = 'once' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'annual';
 
 // ── Categories ───────────────────────────────────────────────────────────────
+export type CategoryType = 'expense' | 'income' | 'both';
+
 export interface CategoryOut {
   id: string;
   name: string;
   color: string | null;
   icon: string | null;
   is_system: boolean;
+  category_type: CategoryType;
+  monthly_budget: string | null;
 }
 
 export interface CategoryCreate {
   name: string;
   color?: string;
   icon?: string;
+  category_type?: CategoryType;
+  monthly_budget?: string;
 }
 
 export interface CategoryUpdate {
   name?: string;
   color?: string;
   icon?: string;
+  category_type?: CategoryType;
+  monthly_budget?: string | null;
 }
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
@@ -34,6 +42,7 @@ export interface UserOut {
   email: string;
   is_active: boolean;
   is_verified: boolean;
+  is_admin: boolean;
 }
 
 export interface TokenPair {
@@ -228,6 +237,41 @@ export interface SubscriptionUpdate {
   end_date?: string;
   is_active?: boolean;
   notes?: string;
+}
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+export type NotificationType = 'welcome' | 'budget_alert' | 'subscription_due' | 'info';
+
+export interface NotificationOut {
+  id: string;
+  title: string;
+  body: string;
+  type: NotificationType;
+  is_read: boolean;
+  created_at: string;
+}
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+export interface AdminUserOut {
+  id: string;
+  name: string;
+  email: string;
+  is_active: boolean;
+  is_admin: boolean;
+  is_verified: boolean;
+  failed_logins: number;
+  locked_until: string | null;
+  created_at: string;
+}
+
+export interface AdminStats {
+  total_users: number;
+  active_users: number;
+  total_transactions: number;
+  total_accounts: number;
+  total_subscriptions: number;
+  total_budgets: number;
+  new_users_this_month: number;
 }
 
 // ── Budgets ───────────────────────────────────────────────────────────────────

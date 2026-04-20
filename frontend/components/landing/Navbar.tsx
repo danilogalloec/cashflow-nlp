@@ -11,8 +11,7 @@ export default function Navbar() {
 
         <div className="hidden md:flex items-center gap-8 text-sm text-slate-400">
           <a href="#how" className="hover:text-white transition-colors">Cómo funciona</a>
-          <a href="#security" className="hover:text-white transition-colors">Seguridad</a>
-          <a href="#pricing" className="hover:text-white transition-colors">Precios</a>
+          <a href="#features" className="hover:text-white transition-colors">Funciones</a>
         </div>
 
         <div className="flex items-center gap-3">

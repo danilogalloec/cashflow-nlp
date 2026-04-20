@@ -54,10 +54,13 @@ export default function Hero() {
       <div className="relative max-w-6xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
         {/* Left — copy */}
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-muted border border-primary/20 text-primary-light text-xs font-medium mb-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-muted border border-primary/20 text-primary-light text-xs font-medium mb-3">
             <Sparkles size={12} />
             Motor NLP en español
           </div>
+          <p className="text-xs text-slate-500 mb-4">
+            <span className="font-semibold text-slate-400">NLP</span> (Procesamiento de Lenguaje Natural) entiende lo que escribes tal como lo dirías — sin formularios ni menús.
+          </p>
           <h1 className="text-5xl lg:text-6xl font-extrabold leading-tight tracking-tight mb-6">
             Controla tu dinero{' '}
             <span className="gradient-text">con tu voz</span>
@@ -83,15 +86,28 @@ export default function Hero() {
             </a>
           </div>
 
-          <div className="mt-10 flex items-center gap-6 text-sm text-slate-500">
-            <span>✓ Gratis para siempre</span>
-            <span>✓ Sin tarjeta de crédito</span>
-            <span>✓ Datos encriptados</span>
+          <div className="mt-10 grid grid-cols-3 gap-4">
+            {[
+              { value: '100%', label: 'En español' },
+              { value: 'NLP', label: 'Lenguaje natural' },
+              { value: 'Gratis', label: 'Para siempre' },
+            ].map((s) => (
+              <div key={s.label} className="bg-bg-surface border border-bg-border rounded-xl px-4 py-3 text-center">
+                <div className="text-lg font-bold text-white">{s.value}</div>
+                <div className="text-xs text-slate-500 mt-0.5">{s.label}</div>
+              </div>
+            ))}
           </div>
         </div>
 
         {/* Right — animated demo */}
         <div className="relative">
+          <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-bg-elevated border border-bg-border rounded-full text-xs text-slate-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              Demo animada · No interactiva
+            </span>
+          </div>
           <div className="bg-bg-surface border border-bg-border rounded-2xl p-1 shadow-2xl">
             {/* terminal header */}
             <div className="flex items-center gap-1.5 px-4 py-3 border-b border-bg-border">

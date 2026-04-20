@@ -4,9 +4,7 @@ import re
 import uuid
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
-_PASSWORD_RE = re.compile(
-    r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]).{12,}$"
-)
+_PASSWORD_RE = re.compile(r"^.{8,}$")
 
 
 class UserRegisterIn(BaseModel):
@@ -27,10 +25,7 @@ class UserRegisterIn(BaseModel):
     @classmethod
     def strong_password(cls, v: str) -> str:
         if not _PASSWORD_RE.match(v):
-            raise ValueError(
-                "Password must be at least 12 characters and include uppercase, "
-                "lowercase, digit, and special character."
-            )
+            raise ValueError("La contraseña debe tener al menos 8 caracteres.")
         return v
 
     @model_validator(mode="after")
@@ -53,6 +48,7 @@ class UserOut(BaseModel):
     email: str
     is_active: bool
     is_verified: bool
+    is_admin: bool
 
 
 class TokenPair(BaseModel):
@@ -63,6 +59,29 @@ class TokenPair(BaseModel):
 
 class RefreshIn(BaseModel):
     refresh_token: str
+
+
+class ForgotPasswordIn(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordIn(BaseModel):
+    token: str
+    new_password: str
+    new_password_confirm: str
+
+    @field_validator("new_password")
+    @classmethod
+    def strong_password(cls, v: str) -> str:
+        if not _PASSWORD_RE.match(v):
+            raise ValueError("La contraseña debe tener al menos 8 caracteres.")
+        return v
+
+    @model_validator(mode="after")
+    def passwords_match(self) -> "ResetPasswordIn":
+        if self.new_password != self.new_password_confirm:
+            raise ValueError("Las contraseñas no coinciden.")
+        return self
 
 
 class UserUpdate(BaseModel):
@@ -86,8 +105,7 @@ class UserUpdate(BaseModel):
     def strong_new_password(cls, v: str | None) -> str | None:
         if v is not None and not _PASSWORD_RE.match(v):
             raise ValueError(
-                "Password must be at least 12 characters and include uppercase, "
-                "lowercase, digit, and special character."
+                "La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un número."
             )
         return v
 

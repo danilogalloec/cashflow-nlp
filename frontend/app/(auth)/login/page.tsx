@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const from = searchParams.get('from') ?? '/dashboard';
@@ -31,7 +31,6 @@ export default function LoginPage() {
       const pair = await api.auth.login({ email: email.trim().toLowerCase(), password });
       localStorage.setItem('cf_access',  pair.access_token);
       localStorage.setItem('cf_refresh', pair.refresh_token);
-      // Signal for Next.js middleware (not httpOnly — for thesis demo)
       document.cookie = 'cf_logged_in=1; path=/; SameSite=Strict; max-age=604800';
       router.replace(from);
     } catch (err) {
@@ -49,12 +48,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="glass rounded-2xl p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Bienvenido de vuelta</h1>
-        <p className="text-slate-400 text-sm mt-1">Inicia sesión en tu cuenta</p>
-      </div>
-
+    <>
       {error && (
         <div className="flex items-start gap-2.5 px-4 py-3 mb-5 bg-red-500/10 border border-red-500/25 rounded-xl text-sm text-red-300 animate-slide-up">
           <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
@@ -63,7 +57,6 @@ export default function LoginPage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        {/* Email */}
         <div>
           <label className="block text-xs font-medium text-slate-400 mb-1.5" htmlFor="email">
             Email
@@ -79,7 +72,6 @@ export default function LoginPage() {
           />
         </div>
 
-        {/* Password */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <label className="text-xs font-medium text-slate-400" htmlFor="password">
@@ -109,7 +101,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Submit */}
         <button
           type="submit"
           disabled={loading}
@@ -129,6 +120,20 @@ export default function LoginPage() {
           Regístrate gratis
         </Link>
       </p>
+    </>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <div className="glass rounded-2xl p-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-white">Bienvenido de vuelta</h1>
+        <p className="text-slate-400 text-sm mt-1">Inicia sesión en tu cuenta</p>
+      </div>
+      <Suspense>
+        <LoginForm />
+      </Suspense>
     </div>
   );
 }

@@ -12,11 +12,7 @@ interface StrengthCriterion { label: string; met: boolean }
 
 function usePasswordStrength(pw: string) {
   return useMemo<StrengthCriterion[]>(() => [
-    { label: 'Mínimo 12 caracteres',            met: pw.length >= 12 },
-    { label: 'Una letra mayúscula',              met: /[A-Z]/.test(pw) },
-    { label: 'Una letra minúscula',              met: /[a-z]/.test(pw) },
-    { label: 'Un número',                        met: /\d/.test(pw) },
-    { label: 'Un carácter especial (!@#$%…)',    met: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(pw) },
+    { label: 'Mínimo 8 caracteres', met: pw.length >= 8 },
   ], [pw]);
 }
 
@@ -54,7 +50,8 @@ export default function RegisterPage() {
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [confirm,  setConfirm]  = useState('');
-  const [showPw,   setShowPw]   = useState(false);
+  const [showPw,      setShowPw]      = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [error,    setError]    = useState('');
   const [loading,  setLoading]  = useState(false);
 
@@ -164,7 +161,7 @@ export default function RegisterPage() {
               autoComplete="new-password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder="Mínimo 12 caracteres"
+              placeholder="Mínimo 8 caracteres"
               className="w-full bg-bg-elevated border border-bg-border rounded-xl px-4 py-2.5 pr-11 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-primary/60 transition-colors"
             />
             <button
@@ -186,12 +183,12 @@ export default function RegisterPage() {
           <div className="relative">
             <input
               id="confirm"
-              type={showPw ? 'text' : 'password'}
+              type={showConfirm ? 'text' : 'password'}
               autoComplete="new-password"
               value={confirm}
               onChange={e => setConfirm(e.target.value)}
               placeholder="Repite tu contraseña"
-              className={`w-full bg-bg-elevated border rounded-xl px-4 py-2.5 pr-11 text-sm text-white placeholder-slate-600 focus:outline-none transition-colors ${
+              className={`w-full bg-bg-elevated border rounded-xl px-4 py-2.5 pr-20 text-sm text-white placeholder-slate-600 focus:outline-none transition-colors ${
                 confirm.length > 0
                   ? pwMatch
                     ? 'border-accent/50 focus:border-accent/70'
@@ -199,13 +196,17 @@ export default function RegisterPage() {
                   : 'border-bg-border focus:border-primary/60'
               }`}
             />
-            {confirm.length > 0 && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                {pwMatch
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+              <button type="button" onClick={() => setShowConfirm(v => !v)}
+                className="text-slate-500 hover:text-slate-300 transition-colors">
+                {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+              {confirm.length > 0 && (
+                pwMatch
                   ? <CheckCircle size={15} className="text-accent" />
-                  : <AlertCircle  size={15} className="text-red-400" />}
-              </div>
-            )}
+                  : <AlertCircle size={15} className="text-red-400" />
+              )}
+            </div>
           </div>
         </div>
 
@@ -221,6 +222,13 @@ export default function RegisterPage() {
             <>Crear cuenta <ArrowRight size={15} /></>
           )}
         </button>
+        {(!pwStrong || !pwMatch) && !loading && (password.length > 0 || confirm.length > 0) && (
+          <p className="text-xs text-slate-500 text-center -mt-1">
+            {!pwStrong
+              ? 'Completa los requisitos de contraseña para continuar'
+              : 'Las contraseñas deben coincidir'}
+          </p>
+        )}
       </form>
 
       <p className="text-center text-xs text-slate-600 mt-4">

@@ -68,6 +68,13 @@ class InputMethod(str, PyEnum):
     import_ = "import"
 
 
+class NotificationType(str, PyEnum):
+    welcome = "welcome"
+    budget_alert = "budget_alert"
+    subscription_due = "subscription_due"
+    info = "info"
+
+
 # ── Models ───────────────────────────────────────────────────────────────────
 
 class User(Base):
@@ -79,6 +86,7 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     failed_logins: Mapped[int] = mapped_column(SmallInteger, default=0, nullable=False)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
@@ -91,6 +99,7 @@ class User(Base):
     subscriptions: Mapped[list[Subscription]] = relationship(back_populates="user", cascade="all, delete-orphan")
     transactions: Mapped[list[Transaction]] = relationship(back_populates="user", cascade="all, delete-orphan")
     budgets: Mapped[list[Budget]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    notifications: Mapped[list[Notification]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class RefreshToken(Base):
@@ -116,6 +125,8 @@ class Category(Base):
     color: Mapped[str | None] = mapped_column(String(7))
     icon: Mapped[str | None] = mapped_column(String(40))
     is_system: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    category_type: Mapped[str] = mapped_column(String(10), nullable=False, default="expense")
+    monthly_budget: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
 
     user: Mapped[User] = relationship(back_populates="categories")
@@ -248,3 +259,30 @@ class Budget(Base):
 
     user: Mapped[User] = relationship(back_populates="budgets")
     category: Mapped[Category | None] = relationship(back_populates="budgets")
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+
+    user: Mapped[User] = relationship()
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    type: Mapped[NotificationType] = mapped_column(Enum(NotificationType, name="notification_type"), nullable=False, default=NotificationType.info)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+
+    user: Mapped[User] = relationship(back_populates="notifications")

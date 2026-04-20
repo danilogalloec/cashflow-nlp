@@ -2,6 +2,8 @@ import type {
   AccountCreate,
   AccountOut,
   AccountUpdate,
+  AdminStats,
+  AdminUserOut,
   BudgetCreate,
   BudgetOut,
   BudgetUpdate,
@@ -15,6 +17,7 @@ import type {
   IncomeSourceOut,
   LoginIn,
   NLPParseOut,
+  NotificationOut,
   RegisterIn,
   SubscriptionCreate,
   SubscriptionOut,
@@ -112,6 +115,10 @@ export const api = {
       req<TokenPair>('POST', '/auth/refresh', { refresh_token: refreshToken }),
     logout: (refreshToken: string) =>
       req<void>('POST', '/auth/logout', { refresh_token: refreshToken }),
+    forgotPassword: (email: string) =>
+      req<{ message: string }>('POST', '/auth/forgot-password', { email }),
+    resetPassword: (token: string, new_password: string, new_password_confirm: string) =>
+      req<{ message: string }>('POST', '/auth/reset-password', { token, new_password, new_password_confirm }),
     me: (token: string) =>
       req<UserOut>('GET', '/auth/me', undefined, token),
     updateProfile: (token: string, data: UserUpdate) =>
@@ -150,8 +157,8 @@ export const api = {
     ) => `/api/v1/transactions/export${qs(filters)}`,
     create: (token: string, data: TransactionCreate) =>
       req<TransactionOut>('POST', '/transactions', data, token),
-    parse: (token: string, text: string, execute = false) =>
-      req<NLPParseOut>('POST', `/transactions/parse${qs({ execute })}`, { text }, token),
+    parse: (token: string, text: string, execute = false, transaction_date?: string) =>
+      req<NLPParseOut>('POST', `/transactions/parse${qs({ execute })}`, { text, transaction_date }, token),
     update: (token: string, id: string, data: Partial<TransactionCreate>) =>
       req<TransactionOut>('PATCH', `/transactions/${id}`, data, token),
     remove: (token: string, id: string) =>
@@ -200,6 +207,32 @@ export const api = {
       req<BudgetOut>('PATCH', `/budgets/${id}`, data, token),
     remove: (token: string, id: string) =>
       req<void>('DELETE', `/budgets/${id}`, undefined, token),
+  },
+
+  notifications: {
+    list: (token: string) =>
+      req<NotificationOut[]>('GET', '/notifications', undefined, token),
+    unreadCount: (token: string) =>
+      req<{ count: number }>('GET', '/notifications/unread-count', undefined, token),
+    checkAlerts: (token: string) =>
+      req<{ created: number }>('POST', '/notifications/check-alerts', undefined, token),
+    markRead: (token: string, id: string) =>
+      req<void>('PATCH', `/notifications/${id}/read`, undefined, token),
+    markAllRead: (token: string) =>
+      req<void>('PATCH', '/notifications/read-all', undefined, token),
+    remove: (token: string, id: string) =>
+      req<void>('DELETE', `/notifications/${id}`, undefined, token),
+  },
+
+  admin: {
+    stats: (token: string) =>
+      req<AdminStats>('GET', '/admin/stats', undefined, token),
+    users: (token: string) =>
+      req<AdminUserOut[]>('GET', '/admin/users', undefined, token),
+    updateUser: (token: string, id: string, data: { is_active?: boolean; is_admin?: boolean }) =>
+      req<AdminUserOut>('PATCH', `/admin/users/${id}`, data, token),
+    deleteUser: (token: string, id: string) =>
+      req<void>('DELETE', `/admin/users/${id}`, undefined, token),
   },
 
   reports: {

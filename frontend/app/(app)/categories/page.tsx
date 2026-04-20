@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Plus, Tag, Loader2, AlertCircle, X, CheckCircle, Pencil, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { api, ApiError } from '@/lib/api';
-import type { CategoryOut, CategoryCreate, CategoryUpdate } from '@/lib/types';
+import type { CategoryOut, CategoryCreate, CategoryUpdate, CategoryType } from '@/lib/types';
 
 const PRESET_COLORS = [
   '#FF6B6B', '#FF8E53', '#FFEAA7', '#55EFC4', '#4ECDC4',
@@ -12,159 +12,208 @@ const PRESET_COLORS = [
   '#96CEB4', '#B2BEC3', '#FD79A8', '#6C5CE7', '#00B894',
 ];
 
+const TYPE_LABELS: Record<CategoryType, string> = {
+  expense: 'Gasto',
+  income: 'Ingreso',
+  both: 'Ambos',
+};
+
+const TYPE_STYLE: Record<CategoryType, string> = {
+  expense: 'bg-red-500/10 text-red-300 border-red-500/20',
+  income: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20',
+  both: 'bg-primary/10 text-primary-light border-primary/20',
+};
+
 const field = 'w-full bg-bg-elevated border border-bg-border rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-primary/60 transition-colors';
 
-// ── Create Modal ──────────────────────────────────────────────────────────────
+function CategoryForm({
+  form, setForm, loading, error, onSubmit, onClose, submitLabel,
+}: {
+  form: CategoryCreate;
+  setForm: React.Dispatch<React.SetStateAction<CategoryCreate>>;
+  loading: boolean;
+  error: string;
+  onSubmit: (e: React.FormEvent) => void;
+  onClose: () => void;
+  submitLabel: string;
+}) {
+  return (
+    <form onSubmit={onSubmit} className="space-y-4">
+      {error && (
+        <div className="flex items-center gap-2 px-4 py-3 bg-red-500/10 border border-red-500/25 rounded-xl text-sm text-red-300">
+          <AlertCircle size={14} />{error}
+        </div>
+      )}
+      <div>
+        <label className="block text-xs font-medium text-slate-400 mb-1.5">Nombre</label>
+        <input className={field} placeholder="Ej: Mascotas, Viajes…" value={form.name}
+          onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-slate-400 mb-1.5">Tipo</label>
+        <div className="grid grid-cols-3 gap-2">
+          {(['expense', 'income', 'both'] as CategoryType[]).map(t => (
+            <button key={t} type="button"
+              onClick={() => setForm(f => ({ ...f, category_type: t }))}
+              className={`py-2 rounded-xl border text-xs font-semibold transition-colors ${
+                form.category_type === t ? TYPE_STYLE[t] : 'border-bg-border text-slate-500 hover:text-slate-300'
+              }`}>
+              {TYPE_LABELS[t]}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-slate-400 mb-1.5">Presupuesto mensual (opcional)</label>
+        <input className={field} type="number" step="0.01" min="0" placeholder="0.00"
+          value={form.monthly_budget ?? ''}
+          onChange={e => setForm(f => ({ ...f, monthly_budget: e.target.value || undefined }))} />
+        <p className="text-xs text-slate-600 mt-1">Si lo defines, se creará un presupuesto automáticamente.</p>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-slate-400 mb-2">Color</label>
+        <div className="flex flex-wrap gap-2 mb-2">
+          {PRESET_COLORS.map(c => (
+            <button key={c} type="button" onClick={() => setForm(f => ({ ...f, color: c }))}
+              className={`w-7 h-7 rounded-lg transition-all ${form.color === c ? 'ring-2 ring-white ring-offset-2 ring-offset-bg-surface scale-110' : 'hover:scale-105'}`}
+              style={{ backgroundColor: c }} />
+          ))}
+        </div>
+        <div className="flex items-center gap-3 mt-2">
+          <input type="color" value={form.color ?? '#74B9FF'}
+            onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
+            className="w-10 h-9 rounded-lg cursor-pointer bg-bg-elevated border border-bg-border p-0.5" />
+          <span className="text-xs text-slate-500">Color personalizado</span>
+        </div>
+      </div>
+      <div className="flex gap-3 pt-1">
+        <button type="button" onClick={onClose}
+          className="flex-1 py-2.5 rounded-xl border border-bg-border text-sm text-slate-400 hover:text-white transition-colors">
+          Cancelar
+        </button>
+        <button type="submit" disabled={loading || !form.name.trim()}
+          className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors">
+          {loading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+          {submitLabel}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (c: CategoryOut) => void }) {
   const { token } = useAuth();
-  const [form, setForm] = useState<CategoryCreate>({ name: '', color: '#74B9FF' });
+  const [form, setForm] = useState<CategoryCreate>({ name: '', color: '#74B9FF', category_type: 'expense' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
-      const cat = await api.categories.create(token, form);
-      onCreated(cat);
+      onCreated(await api.categories.create(token, form));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Error al crear la categoría');
-    } finally {
-      setLoading(false);
-    }
+      setError(err instanceof ApiError ? err.message : 'Error al crear');
+    } finally { setLoading(false); }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-bg-surface border border-bg-border rounded-2xl p-6 w-full max-w-sm mx-4">
+      <div className="bg-bg-surface border border-bg-border rounded-2xl p-6 w-full max-w-sm mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-semibold text-white">Nueva categoría</h2>
-          <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors"><X size={18} /></button>
+          <button onClick={onClose} className="text-slate-500 hover:text-white"><X size={18} /></button>
         </div>
-        {error && (
-          <div className="flex items-center gap-2 px-4 py-3 mb-4 bg-red-500/10 border border-red-500/25 rounded-xl text-sm text-red-300">
-            <AlertCircle size={14} />{error}
-          </div>
-        )}
-        <form onSubmit={submit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">Nombre</label>
-            <input className={field} placeholder="Ej: Mascotas, Viajes, Deporte…" value={form.name}
-              onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-2">Color</label>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {PRESET_COLORS.map(c => (
-                <button key={c} type="button"
-                  onClick={() => setForm(f => ({ ...f, color: c }))}
-                  className={`w-7 h-7 rounded-lg transition-all ${form.color === c ? 'ring-2 ring-white ring-offset-2 ring-offset-bg-surface scale-110' : 'hover:scale-105'}`}
-                  style={{ backgroundColor: c }}
-                />
-              ))}
-            </div>
-            <div className="flex items-center gap-3 mt-2">
-              <input type="color" value={form.color ?? '#74B9FF'}
-                onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
-                className="w-10 h-9 rounded-lg cursor-pointer bg-bg-elevated border border-bg-border p-0.5" />
-              <span className="text-xs text-slate-500">O elige un color personalizado</span>
-            </div>
-          </div>
-          <div className="flex gap-3 pt-1">
-            <button type="button" onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl border border-bg-border text-sm text-slate-400 hover:text-white transition-colors">
-              Cancelar
-            </button>
-            <button type="submit" disabled={loading || !form.name.trim()}
-              className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors">
-              {loading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-              Crear
-            </button>
-          </div>
-        </form>
+        <CategoryForm form={form} setForm={setForm} loading={loading} error={error}
+          onSubmit={submit} onClose={onClose} submitLabel="Crear" />
       </div>
     </div>
   );
 }
 
-// ── Edit Modal ────────────────────────────────────────────────────────────────
 function EditModal({ cat, onClose, onUpdated }: { cat: CategoryOut; onClose: () => void; onUpdated: (c: CategoryOut) => void }) {
   const { token } = useAuth();
-  const [form, setForm] = useState<CategoryUpdate>({ name: cat.name, color: cat.color ?? '#74B9FF' });
+  const [form, setForm] = useState<CategoryCreate>({
+    name: cat.name,
+    color: cat.color ?? '#74B9FF',
+    category_type: (cat.category_type as CategoryType) ?? 'expense',
+    monthly_budget: cat.monthly_budget ?? undefined,
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
-      const updated = await api.categories.update(token, cat.id, form);
-      onUpdated(updated);
+      const payload: CategoryUpdate = {
+        name: form.name, color: form.color,
+        category_type: form.category_type,
+        monthly_budget: form.monthly_budget || null,
+      };
+      onUpdated(await api.categories.update(token, cat.id, payload));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al actualizar');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-bg-surface border border-bg-border rounded-2xl p-6 w-full max-w-sm mx-4">
+      <div className="bg-bg-surface border border-bg-border rounded-2xl p-6 w-full max-w-sm mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-semibold text-white">Editar categoría</h2>
-          <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors"><X size={18} /></button>
+          <button onClick={onClose} className="text-slate-500 hover:text-white"><X size={18} /></button>
         </div>
-        {error && (
-          <div className="flex items-center gap-2 px-4 py-3 mb-4 bg-red-500/10 border border-red-500/25 rounded-xl text-sm text-red-300">
-            <AlertCircle size={14} />{error}
-          </div>
-        )}
-        <form onSubmit={submit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">Nombre</label>
-            <input className={field} value={form.name ?? ''} required
-              onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-400 mb-2">Color</label>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {PRESET_COLORS.map(c => (
-                <button key={c} type="button"
-                  onClick={() => setForm(f => ({ ...f, color: c }))}
-                  className={`w-7 h-7 rounded-lg transition-all ${form.color === c ? 'ring-2 ring-white ring-offset-2 ring-offset-bg-surface scale-110' : 'hover:scale-105'}`}
-                  style={{ backgroundColor: c }}
-                />
-              ))}
-            </div>
-            <div className="flex items-center gap-3 mt-2">
-              <input type="color" value={form.color ?? '#74B9FF'}
-                onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
-                className="w-10 h-9 rounded-lg cursor-pointer bg-bg-elevated border border-bg-border p-0.5" />
-              <span className="text-xs text-slate-500">O elige un color personalizado</span>
-            </div>
-          </div>
-          <div className="flex gap-3 pt-1">
-            <button type="button" onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl border border-bg-border text-sm text-slate-400 hover:text-white transition-colors">
-              Cancelar
-            </button>
-            <button type="submit" disabled={loading || !form.name?.trim()}
-              className="flex-1 flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors">
-              {loading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-              Guardar
-            </button>
-          </div>
-        </form>
+        <CategoryForm form={form} setForm={setForm as React.Dispatch<React.SetStateAction<CategoryCreate>>}
+          loading={loading} error={error} onSubmit={submit} onClose={onClose} submitLabel="Guardar" />
       </div>
     </div>
   );
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+function CategoryCard({ cat, deleting, onEdit, onDelete }: {
+  cat: CategoryOut; deleting: string | null;
+  onEdit: () => void; onDelete: (() => void) | null;
+}) {
+  const type = (cat.category_type ?? 'expense') as CategoryType;
+  return (
+    <div className="bg-bg-surface border border-bg-border rounded-2xl p-4 flex items-center gap-3 group hover:border-slate-600 transition-colors">
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+        style={{ backgroundColor: cat.color ? `${cat.color}25` : '#ffffff10' }}>
+        <div className="w-4 h-4 rounded-full" style={{ backgroundColor: cat.color ?? '#B2BEC3' }} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-sm font-medium text-white truncate">{cat.name}</p>
+          <span className={`px-1.5 py-0.5 rounded border text-xs font-medium ${TYPE_STYLE[type]}`}>
+            {TYPE_LABELS[type]}
+          </span>
+        </div>
+        {cat.monthly_budget && (
+          <p className="text-xs text-slate-500 mt-0.5">Presupuesto: ${parseFloat(cat.monthly_budget).toFixed(2)}/mes</p>
+        )}
+        {cat.is_system && !cat.monthly_budget && (
+          <p className="text-xs text-slate-600">Sistema</p>
+        )}
+      </div>
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button onClick={onEdit}
+          className="p-1.5 rounded-lg text-slate-500 hover:text-primary-light hover:bg-primary/10 transition-colors">
+          <Pencil size={13} />
+        </button>
+        {onDelete && (
+          <button onClick={onDelete} disabled={deleting === cat.id}
+            className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50">
+            {deleting === cat.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function CategoriesPage() {
   const { token } = useAuth();
   const [categories, setCategories] = useState<CategoryOut[]>([]);
@@ -173,6 +222,7 @@ export default function CategoriesPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<CategoryOut | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [typeFilter, setTypeFilter] = useState<CategoryType | 'all'>('all');
 
   useEffect(() => {
     if (!token) return;
@@ -190,27 +240,44 @@ export default function CategoriesPage() {
       setCategories(prev => prev.filter(c => c.id !== cat.id));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Error al eliminar');
-    } finally {
-      setDeleting(null);
-    }
+    } finally { setDeleting(null); }
   };
 
-  const system = categories.filter(c => c.is_system);
-  const custom = categories.filter(c => !c.is_system);
+  const filtered = typeFilter === 'all'
+    ? categories
+    : categories.filter(c => c.category_type === typeFilter || c.category_type === 'both');
+
+  const system = filtered.filter(c => c.is_system);
+  const custom = filtered.filter(c => !c.is_system);
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white">Categorías</h1>
           <p className="text-slate-400 text-sm mt-1">
-            {system.length} del sistema · {custom.length} personalizadas
+            {categories.filter(c => c.is_system).length} del sistema · {categories.filter(c => !c.is_system).length} personalizadas
           </p>
         </div>
         <button onClick={() => setShowCreate(true)}
           className="flex items-center gap-2 bg-primary hover:bg-primary-hover text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors">
           <Plus size={15} />Nueva categoría
         </button>
+      </div>
+
+      <div className="flex gap-2 mb-6">
+        {(['all', 'expense', 'income'] as const).map(t => (
+          <button key={t} onClick={() => setTypeFilter(t)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+              typeFilter === t
+                ? t === 'all' ? 'bg-primary/15 text-primary-light border-primary/30'
+                  : t === 'expense' ? 'bg-red-500/15 text-red-300 border-red-500/30'
+                  : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                : 'border-bg-border text-slate-500 hover:text-slate-300'
+            }`}>
+            {t === 'all' ? 'Todas' : t === 'expense' ? 'Gastos' : 'Ingresos'}
+          </button>
+        ))}
       </div>
 
       {error && (
@@ -226,7 +293,6 @@ export default function CategoriesPage() {
         </div>
       ) : (
         <div className="space-y-8">
-          {/* Custom categories */}
           <div>
             <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">
               Mis categorías ({custom.length})
@@ -235,7 +301,6 @@ export default function CategoriesPage() {
               <div className="bg-bg-surface border border-bg-border border-dashed rounded-2xl py-12 flex flex-col items-center text-slate-500">
                 <Tag size={32} className="mb-3 opacity-30" />
                 <p className="text-sm font-medium">Sin categorías personalizadas</p>
-                <p className="text-xs mt-1">Crea una para organizar mejor tus gastos</p>
                 <button onClick={() => setShowCreate(true)}
                   className="mt-4 flex items-center gap-1.5 text-xs text-primary-light hover:underline">
                   <Plus size={12} />Crear categoría
@@ -250,8 +315,6 @@ export default function CategoriesPage() {
               </div>
             )}
           </div>
-
-          {/* System categories */}
           <div>
             <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3">
               Categorías del sistema ({system.length})
@@ -267,55 +330,19 @@ export default function CategoriesPage() {
       )}
 
       {showCreate && (
-        <CreateModal
-          onClose={() => setShowCreate(false)}
-          onCreated={cat => { setCategories(prev => [...prev, cat].sort((a, b) => a.name.localeCompare(b.name))); setShowCreate(false); }}
-        />
+        <CreateModal onClose={() => setShowCreate(false)}
+          onCreated={cat => {
+            setCategories(prev => [...prev, cat].sort((a, b) => a.name.localeCompare(b.name)));
+            setShowCreate(false);
+          }} />
       )}
       {editing && (
-        <EditModal
-          cat={editing}
-          onClose={() => setEditing(null)}
+        <EditModal cat={editing} onClose={() => setEditing(null)}
           onUpdated={updated => {
             setCategories(prev => prev.map(c => c.id === updated.id ? updated : c));
             setEditing(null);
-          }}
-        />
+          }} />
       )}
-    </div>
-  );
-}
-
-function CategoryCard({ cat, deleting, onEdit, onDelete }: {
-  cat: CategoryOut;
-  deleting: string | null;
-  onEdit: () => void;
-  onDelete: (() => void) | null;
-}) {
-  return (
-    <div className="bg-bg-surface border border-bg-border rounded-2xl p-4 flex items-center gap-3 group hover:border-slate-600 transition-colors">
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{ backgroundColor: cat.color ? `${cat.color}25` : '#ffffff10' }}>
-        <div className="w-4 h-4 rounded-full" style={{ backgroundColor: cat.color ?? '#B2BEC3' }} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-white truncate">{cat.name}</p>
-        {cat.is_system && <p className="text-xs text-slate-600">Sistema</p>}
-      </div>
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={onEdit}
-          className="p-1.5 rounded-lg text-slate-500 hover:text-primary-light hover:bg-primary/10 transition-colors"
-          title="Editar color">
-          <Pencil size={13} />
-        </button>
-        {onDelete && (
-          <button onClick={onDelete} disabled={deleting === cat.id}
-            className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
-            title="Eliminar">
-            {deleting === cat.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-          </button>
-        )}
-      </div>
     </div>
   );
 }

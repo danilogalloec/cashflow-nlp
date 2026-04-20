@@ -45,14 +45,16 @@ function ParseCard({
   onDismiss,
 }: {
   msg: ParseMessage;
-  onConfirm: (msg: ParseMessage, overrideDir?: TransactionDirection) => void;
+  onConfirm: (msg: ParseMessage, overrideDir?: TransactionDirection, date?: string) => void;
   onDismiss: (id: string) => void;
 }) {
   const { result, confirmed } = msg;
   const [selectedDir, setSelectedDir] = useState<TransactionDirection | null>(result.direction ?? null);
+  const [dateOverride, setDateOverride] = useState<string>(
+    result.transaction_date ?? new Date().toISOString().split('T')[0]
+  );
   const pct = Math.round(result.confidence * 100);
 
-  // Can confirm if we have amount + direction (either from parser or user selection)
   const effectiveDir = selectedDir;
   const canConfirm = !!result.amount && !!effectiveDir;
   const dirCfg = effectiveDir ? DIR_CONFIG[effectiveDir] : null;
@@ -101,18 +103,24 @@ function ParseCard({
       )}
 
       {/* Metadata chips */}
-      {(result.category_hint || result.transaction_date) && (
+      {result.category_hint && (
         <div className="flex flex-wrap gap-1.5 mb-3 text-xs">
-          {result.category_hint && (
-            <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary-light border border-primary/20">
-              📁 {result.category_hint}
-            </span>
-          )}
-          {result.transaction_date && (
-            <span className="px-2 py-0.5 rounded-md bg-bg-border text-slate-400">
-              📅 {result.transaction_date}
-            </span>
-          )}
+          <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary-light border border-primary/20">
+            📁 {result.category_hint}
+          </span>
+        </div>
+      )}
+
+      {/* Date picker */}
+      {!confirmed && (
+        <div className="mb-3">
+          <label className="block text-xs text-slate-500 mb-1">📅 Fecha de la transacción</label>
+          <input
+            type="date"
+            value={dateOverride}
+            onChange={e => setDateOverride(e.target.value)}
+            className="w-full bg-bg-border border border-bg-border rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-primary/60 transition-colors"
+          />
         </div>
       )}
 
@@ -137,7 +145,7 @@ function ParseCard({
       {!confirmed && (
         <div className="flex gap-2">
           <button
-            onClick={() => onConfirm(msg, effectiveDir ?? undefined)}
+            onClick={() => onConfirm(msg, effectiveDir ?? undefined, dateOverride)}
             disabled={!canConfirm}
             className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-white bg-primary hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed px-3 py-2 rounded-lg transition-colors"
           >
@@ -210,27 +218,24 @@ export default function NLPChat({ onTransactionCreated }: NLPChatProps) {
     }
   }, [input, isLoading, token]);
 
-  const handleConfirm = useCallback(async (parseMsg: ParseMessage, overrideDir?: TransactionDirection) => {
+  const handleConfirm = useCallback(async (parseMsg: ParseMessage, overrideDir?: TransactionDirection, dateOverride?: string) => {
     if (!token) return;
     setIsLoading(true);
 
-    // If user selected a direction manually, patch it into the raw_text before re-parsing with execute
-    // We send the original text but force execute=true; for overrideDir we create the transaction directly
     try {
       let tx: TransactionOut | null = null;
 
       if (overrideDir && overrideDir !== parseMsg.result.direction) {
-        // Build a patched text so the parser detects the correct direction
         const dirPrefix: Record<TransactionDirection, string> = {
           expense: 'gasté ',
           income: 'recibí ',
           transfer: 'transferí ',
         };
         const patchedText = dirPrefix[overrideDir] + parseMsg.result.raw_text;
-        const result = await api.transactions.parse(token, patchedText, true);
+        const result = await api.transactions.parse(token, patchedText, true, dateOverride);
         tx = result.transaction ?? null;
       } else {
-        const result = await api.transactions.parse(token, parseMsg.result.raw_text, true);
+        const result = await api.transactions.parse(token, parseMsg.result.raw_text, true, dateOverride);
         tx = result.transaction ?? null;
       }
 
@@ -268,7 +273,7 @@ export default function NLPChat({ onTransactionCreated }: NLPChatProps) {
           <span className="text-primary-light text-xs font-bold">AI</span>
         </div>
         <div>
-          <p className="text-sm font-semibold text-white">Asistente de Gastos</p>
+          <p className="text-sm font-semibold text-white">Asistente de Transacciones</p>
           <p className="text-xs text-slate-500">NLP en español · Escribe naturalmente</p>
         </div>
         <div className="ml-auto flex items-center gap-1.5">
